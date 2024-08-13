@@ -1,16 +1,24 @@
-import React from "react";
-import { Text, StyleSheet, View, TouchableOpacity } from "react-native";
+import React from 'react';
+import { Button, View } from 'react-native';
+import { AuthManager } from './path/to/authManager'; // Adjust the import path as necessary
 
 const HomeScreen = ({ navigation }) => {
+  const handleSignIn = async () => {
+    try {
+      await AuthManager.signInAsync();
+      // Navigate to the next screen or perform any other action after successful sign-in
+    } catch (error) {
+      console.error('Sign-in failed', error);
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.welcome}>Welcome to Gybe</Text>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Detail')}>
-        <Text style={styles.buttonText}>Sign On</Text>
-      </TouchableOpacity>
+    <View>
+      <Button title="Sign In" onPress={handleSignIn} />
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
