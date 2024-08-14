@@ -1,79 +1,60 @@
+import * as AuthSession from 'expo-auth-session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authorize, refresh, AuthConfiguration } from 'react-native-app-auth';
-import { AuthConfig } from '../../authConfig';
 
-const config: AuthConfiguration = {
-  clientId: AuthConfig.appId,
-  redirectUrl: 'https://login.microsoftonline.com/common/oauth2/nativeclient',
-  scopes: AuthConfig.appScopes,
-  additionalParameters: { prompt: 'select_account' },
-  serviceConfiguration: {
-    authorizationEndpoint: 'https://login.microsoftonline.com/444f5a79-d01d-4ae0-956f-de57f3e55942/oauth2/v2.0/authorize',
-    tokenEndpoint: 'https://login.microsoftonline.com/444f5a79-d01d-4ae0-956f-de57f3e55942/oauth2/v2.0/token',
-  },
+// Azure AD Configuration
+const config = {
+  clientId: '5271376c-3a90-43bf-bdfd-4ef45fe68031',
+  redirectUri: AuthSession.makeRedirectUri({
+
+  }),
+  scopes: ['openid', 'profile', 'email', 'offline_access', 'User.Read'],
+  responseType: 'token', 
+  authorizationEndpoint: 'https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize',
+  tokenEndpoint: 'https://login.microsoftonline.com/organizations/oauth2/v2.0/token',
 };
 
 export class AuthManager {
   static signInAsync = async () => {
     try {
-      const result = await authorize(config);
-      console.log(result.accessToken);
+      console.log('Redirect URI:', config.redirectUri);
 
-      // Store the access token, refresh token, and expiration time in storage
-      await AsyncStorage.setItem('userToken', result.accessToken);
-      await AsyncStorage.setItem('refreshToken', result.refreshToken);
-      await AsyncStorage.setItem('expireTime', result.accessTokenExpirationDate);
+      console.log('Signing in...');
+     
+      // Create a discovery document
+      const discovery = {
+        authorizationEndpoint: config.authorizationEndpoint,
+        tokenEndpoint: config.tokenEndpoint,
+      };
+
+      // Create an authorization request
+      const authRequest = new AuthSession.AuthRequest({
+        clientId: config.clientId,
+        redirectUri: config.redirectUri,
+        scopes: config.scopes,
+        responseType: config.responseType,
+        // Remove authorizationEndpoint from here
+      });
+
+      // Start the authorization flow
+      const result = await authRequest.promptAsync(discovery);
+
+      if (result.type === 'success' && result.authentication?.accessToken) {
+        console.log('Authorization result:', result);
+        // Store tokens and expiration date
+        await AsyncStorage.setItem('accessToken', result.authentication.accessToken);
+        // Handle token expiration based on the result
+        const expiresIn = result.authentication.expiresIn
+          ? (result.authentication.expiresIn * 1000) + new Date().getTime()
+          : new Date().getTime() + (60 * 60 * 1000); // Default to 1 hour if expiration not provided
+        await AsyncStorage.setItem('expireTime', expiresIn.toString());
+        return result;
+      } else {
+        throw new Error('Authentication failed');
+      }
     } catch (error) {
       console.error('Sign-in failed', error);
+      throw error;
     }
   };
 
-  static signOutAsync = async () => {
-    try {
-      // Clear storage
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('refreshToken');
-      await AsyncStorage.removeItem('expireTime');
-    } catch (error) {
-      console.error('Sign-out failed', error);
-    }
-  };
-
-  static getAccessTokenAsync = async () => {
-    try {
-      const expireTime = await AsyncStorage.getItem('expireTime');
-
-      if (expireTime !== null) {
-        // Get expiration time - 5 minutes
-        const expire = new Date(new Date(expireTime).getTime() - 5 * 60 * 1000);
-        const now = new Date();
-
-        if (now >= expire) {
-          // Expired, refresh
-          console.log('Refreshing token');
-          const refreshToken = await AsyncStorage.getItem('refreshToken');
-          console.log(`Refresh token: ${refreshToken}`);
-          const result = await refresh(config, {
-            refreshToken: refreshToken || '',
-          });
-
-          // Store the new access token, refresh token, and expiration time in storage
-          await AsyncStorage.setItem('userToken', result.accessToken);
-          await AsyncStorage.setItem('refreshToken', result.refreshToken || '');
-          await AsyncStorage.setItem('expireTime', result.accessTokenExpirationDate);
-
-          return result.accessToken;
-        }
-
-        // Not expired, just return saved access token
-        const accessToken = await AsyncStorage.getItem('userToken');
-        return accessToken;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Failed to get access token', error);
-      return null;
-    }
-  };
 }
