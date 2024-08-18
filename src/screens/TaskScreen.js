@@ -1,6 +1,6 @@
-// src/screens/TaskScreen.js
 import React, { useState } from 'react';
-import { Text, StyleSheet, View, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { CheckBox } from 'react-native-elements';
 
 const TaskScreen = ({ navigation }) => {
   const [tasks, setTasks] = useState([
@@ -18,19 +18,23 @@ const TaskScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.greeting}>Hi Terry!</Text>
-      <Text style={styles.queue}>Today's job queue:</Text>
+      <View style={styles.greetingBox}>
+        <Text style={styles.greeting}>Hi Terry!</Text>
+        <Text style={styles.QueueTxt}>Today’s job queue:</Text>
+      </View>
+      <View style={styles.tasksWrapper}>
       {tasks.map(task => (
         <View key={task.id} style={styles.taskContainer}>
-          <Switch
-            value={task.completed}
-            onValueChange={() => toggleTask(task.id)}
-            thumbColor={task.completed ? '#ffcc00' : '#ccc'}
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
+          <CheckBox
+            checked={task.completed}
+            onPress={() => toggleTask(task.id)}
+            checkedColor="#ffcc00"
+            uncheckedColor="#ccc"
           />
           <Text style={styles.taskTitle}>{task.title}</Text>
         </View>
       ))}
+      </View>
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>BACK</Text>
@@ -49,57 +53,83 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#000033",
+    backgroundColor: "#000"
+  },
+  greetingBox: {
+    position: "absolute",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 350,
+    height: 120,
+    top: 60, // Reduced from 20 to 10
+    backgroundColor: "#CAC3C3", 
+
   },
   greeting: {
-    fontSize: 24,
+    position: "absolute",
+    textAlign: "center",
+    width: 191,
+    height: 27,
+    top: 31,
+    fontStyle: "normal",
     fontWeight: "bold",
-    color: "white",
-    marginBottom: 10,
+    fontSize: 20,
+    lineHeight: 20,
+    textAlign: "center",
   },
-  queue: {
-    fontSize: 18,
+  QueueTxt: {
+    position: "absolute",
+    top: 70,
+    fontFamily: 'Jomhuria-Regular', 
+    fontStyle: "normal",
     fontWeight: "bold",
-    color: "white",
-    marginBottom: 20,
+    fontSize: 25,
+  },
+  tasksWrapper:{
+    marginTop: 0, // Adjusted to ensure it is right below the greetingBox
+    width: "100%",
   },
   taskContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
+    marginTop: 0, // Adjusted to ensure it is right below the greetingBox
+    alignItems: "center", 
+    justifyContent: "flex-start", 
+    width: "100%",
   },
   taskTitle: {
     fontSize: 18,
     color: "white",
     marginLeft: 10,
   },
+
+  line: {
+    width: "100%",
+    height: 1,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    marginTop: 10,
+    marginBottom: 10,
+    alignSelf: "stretch",
+  },
+
   buttonContainer: {
     flexDirection: "row",
-    marginTop: 20,
+    marginTop: 80,
   },
   backButton: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: "#333",
-    alignItems: "center",
-    marginRight: 10,
-    borderRadius: 5,
-  },
-  startButton: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: "#ffcc00",
-    alignItems: "center",
-    borderRadius: 5,
+    marginRight: 150, // Increased margin to add more space
+    padding: 10,
+    backgroundColor: "#ccc",
   },
   backText: {
-    color: "white",
-    fontSize: 18,
+    color: "#000",
+  },
+  startButton: {
+    padding: 10,
+    backgroundColor: "#ffcc00",
   },
   startText: {
-    color: "#000033",
-    fontSize: 18,
-    fontWeight: "bold",
+    color: "#000",
   },
 });
 

@@ -1,23 +1,22 @@
-import { createAppContainer } from "react-navigation";
-import { createStackNavigator } from "react-navigation-stack";
-import HomeScreen from "./src/screens/HomeScreen";
-import DetailScreen from "./src/screens/DetailScreen";
-import TaskScreen from "./src/screens/TaskScreen"; // Import your TaskScreen
+import * as React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import HomeScreen from './src/screens/HomeScreen'; // Adjust the path as necessary
+import DetailScreen from './src/screens/DetailScreen'; // Adjust the path as necessary
+import TaskScreen from './src/screens/TaskScreen';
 
-const navigator = createStackNavigator(
-  {
-    Home: HomeScreen,
-    Detail: DetailScreen,
-    Task: TaskScreen, 
+const Stack = createStackNavigator();
 
+function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Detail" component={DetailScreen} />
+        <Stack.Screen name="Task" component={TaskScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
 
-  },
-  {
-    initialRouteName: "Home",
-    defaultNavigationOptions: {
-      title: "App",
-    },
-  }
-);
-
-export default createAppContainer(navigator);
+export default App;

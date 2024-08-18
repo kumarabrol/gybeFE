@@ -1,13 +1,21 @@
-import React from "react";
-import { Text, StyleSheet, View, TouchableOpacity } from "react-native";
+import React from 'react';
+import { Button, View, StyleSheet } from 'react-native';
+import { AuthManager } from './authManager'; // Adjust the path as necessary
 
 const HomeScreen = ({ navigation }) => {
+  const handleSignIn = async () => {
+    try {
+      const result = await AuthManager.signInAsync();
+      console.log('Sign-in result:', result);
+      navigation.navigate('Task'); // Navigate to the next screen
+    } catch (error) {
+      console.error('Sign-in failed:', error);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.welcome}>Welcome to Gybe</Text>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Detail')}>
-        <Text style={styles.buttonText}>Sign On</Text>
-      </TouchableOpacity>
+      <Button title="Sign In" onPress={handleSignIn} />
     </View>
   );
 };
@@ -15,24 +23,8 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  welcome: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  button: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: "#007bff",
-    borderRadius: 5,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
