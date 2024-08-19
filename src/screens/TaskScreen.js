@@ -1,20 +1,45 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Text, StyleSheet, View, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { CheckBox } from 'react-native-elements';
+import axios from 'axios';
 
 const TaskScreen = ({ navigation }) => {
-  const [tasks, setTasks] = useState([
-    { id: 1, title: "Review Bill of Materials", completed: false },
-    { id: 2, title: "Assemble electronics components", completed: false },
-    { id: 3, title: "Run validation testing", completed: false },
-    { id: 4, title: "Perform Final QA", completed: false },
-  ]);
+  const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      const fetchTasks = async () => {
+        try {
+          const response = await axios.get('http://gybeapis-v31.westus.azurecontainer.io/api/assignment/assignments/1');
+          const fetchedTasks = response.data.map(task => ({
+            id: task.assignmentId,
+            title: task.assignmentInstructions,
+            completed: task.assignmentStatus === 3, // Assuming 3 represents a completed task
+          }));
+          setTasks(fetchedTasks);
+        } catch (error) {
+          console.error('Error fetching tasks:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchTasks();
+    }, []);
 
   const toggleTask = (taskId) => {
     setTasks(tasks.map(task => 
       task.id === taskId ? { ...task, completed: !task.completed } : task
     ));
   };
+
+  if (loading) {
+      return (
+        <View style={styles.container}>
+          <ActivityIndicator size="large" color="#ffcc00" />
+        </View>
+      );
+    }
 
   return (
     <View style={styles.container}>
