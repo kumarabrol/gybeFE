@@ -10,7 +10,7 @@ const TaskScreen = ({ navigation }) => {
     useEffect(() => {
       const fetchTasks = async () => {
         try {
-          const response = await axios.get('http://gybeapis-v31.westus.azurecontainer.io/api/assignment/assignments/1');
+          const response = await axios.get('http://gybeapis-v32.westus.azurecontainer.io/api/Assignment/Assignments/1');
           const fetchedTasks = response.data.map(task => ({
             id: task.assignmentId,
             title: task.assignmentInstructions,
