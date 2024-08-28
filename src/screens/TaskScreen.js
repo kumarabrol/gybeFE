@@ -1,71 +1,112 @@
-import React, { useState, useEffect } from 'react';
-import { Text, StyleSheet, View, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
-import { CheckBox } from 'react-native-elements';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList } from 'react-native';
 import axios from 'axios';
+import { useFocusEffect } from '@react-navigation/native';
 
-const TaskScreen = ({ navigation }) => {
+const TaskScreen = ({ navigation, route }) => {
   const [tasks, setTasks] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
 
-    useEffect(() => {
-      const fetchTasks = async () => {
-        try {
-          const response = await axios.get('http://gybeapis-v32.westus.azurecontainer.io/api/Assignment/Assignments/1');
-          const fetchedTasks = response.data.map(task => ({
-            id: task.assignmentId,
-            title: task.assignmentInstructions,
-            completed: task.assignmentStatus === 3, // Assuming 3 represents a completed task
-          }));
-          setTasks(fetchedTasks);
-        } catch (error) {
-          console.error('Error fetching tasks:', error);
-        } finally {
-          setLoading(false);
-        }
-      };
+  const fetchTasks = useCallback(async () => {
+    try {
+      const response = await axios.get('http://gybeapis-v32.westus.azurecontainer.io/api/Assignment/Assignments/1');
+      const fetchedTasks = response.data.map(task => ({
+        id: task.assignmentId,
+        title: task.assignmentInstructions,
+        completed: task.assignmentStatus === 3, // Assuming 3 represents a completed task
+      }));
+      console.log('Fetched tasks:', fetchedTasks);
+      setTasks(fetchedTasks);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-      fetchTasks();
-    }, []);
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
-  const toggleTask = (taskId) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ));
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Screen focused. Route params:', route.params);
+      if (route.params?.completedTaskId) {
+        console.log('Completed task ID received:', route.params.completedTaskId);
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === route.params.completedTaskId 
+              ? { ...task, completed: true } 
+              : task
+          )
+        );
+        setSelectedTaskId(null);
+      }
+    }, [route.params?.completedTaskId])
+  );
+
+  const handleTaskPress = (taskId) => {
+    if (!tasks.find(task => task.id === taskId).completed) {
+      setSelectedTaskId(taskId);
+    }
   };
 
-  if (loading) {
-      return (
-        <View style={styles.container}>
-          <ActivityIndicator size="large" color="#ffcc00" />
-        </View>
-      );
+  const handleStartPress = () => {
+    if (selectedTaskId) {
+      navigation.navigate('TaskDetail', { taskId: selectedTaskId });
     }
+  };
+
+  const renderTask = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.taskItem, 
+        item.completed && styles.completedTaskItem,
+        item.id === selectedTaskId && styles.selectedTaskItem
+      ]}
+      onPress={() => handleTaskPress(item.id)}
+      disabled={item.completed}
+    >
+      <Text style={[
+        styles.taskTitle, 
+        item.completed && styles.completedTaskTitle
+      ]}>
+        {item.title}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#ffcc00" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.greetingBox}>
         <Text style={styles.greeting}>Hi Terry!</Text>
-        <Text style={styles.QueueTxt}>Today’s job queue:</Text>
+        <Text style={styles.QueueTxt}>Today's job queue:</Text>
       </View>
-      <View style={styles.tasksWrapper}>
-      {tasks.map(task => (
-        <View key={task.id} style={styles.taskContainer}>
-          <CheckBox
-            checked={task.completed}
-            onPress={() => toggleTask(task.id)}
-            checkedColor="#ffcc00"
-            uncheckedColor="#ccc"
-          />
-          <Text style={styles.taskTitle}>{task.title}</Text>
-        </View>
-      ))}
-      </View>
+      <FlatList
+        style={styles.tasksWrapper}
+        data={tasks}
+        renderItem={renderTask}
+        keyExtractor={item => item.id.toString()}
+      />
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>BACK</Text>
+          <Text style={styles.buttonText}>BACK</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.startButton}>
-          <Text style={styles.startText}>START</Text>
+        <TouchableOpacity 
+          style={[styles.startButton, !selectedTaskId && styles.disabledButton]} 
+          onPress={handleStartPress}
+          disabled={!selectedTaskId}
+        >
+          <Text style={styles.buttonText}>START</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -81,80 +122,75 @@ const styles = StyleSheet.create({
     backgroundColor: "#000"
   },
   greetingBox: {
-    position: "absolute",
     justifyContent: "center",
     alignItems: "center",
-    width: 350,
+    width: '100%',
     height: 120,
-    top: 60, // Reduced from 20 to 10
+    marginBottom: 20,
     backgroundColor: "#CAC3C3", 
-
   },
   greeting: {
-    position: "absolute",
-    textAlign: "center",
-    width: 191,
-    height: 27,
-    top: 31,
     fontStyle: "normal",
     fontWeight: "bold",
     fontSize: 20,
-    lineHeight: 20,
     textAlign: "center",
   },
   QueueTxt: {
-    position: "absolute",
-    top: 70,
+    marginTop: 10,
     fontFamily: 'Jomhuria-Regular', 
     fontStyle: "normal",
     fontWeight: "bold",
     fontSize: 25,
   },
   tasksWrapper:{
-    marginTop: 0, // Adjusted to ensure it is right below the greetingBox
+    flex: 1,
     width: "100%",
   },
-  taskContainer: {
-    flexDirection: "row",
-    marginTop: 0, // Adjusted to ensure it is right below the greetingBox
-    alignItems: "center", 
-    justifyContent: "flex-start", 
-    width: "100%",
+  taskItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  completedTaskItem: {
+    backgroundColor: '#222',
+  },
+  selectedTaskItem: {
+    backgroundColor: '#333',
   },
   taskTitle: {
     fontSize: 18,
     color: "white",
-    marginLeft: 10,
   },
-
-  line: {
-    width: "100%",
-    height: 1,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    marginTop: 10,
-    marginBottom: 10,
-    alignSelf: "stretch",
+  completedTaskTitle: {
+    color: "grey",
+    textDecorationLine: 'line-through',
   },
-
   buttonContainer: {
-    flexDirection: "row",
-    marginTop: 80,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 20,
   },
   backButton: {
-    marginRight: 150, // Increased margin to add more space
-    padding: 10,
+    flex: 1,
+    padding: 15,
     backgroundColor: "#ccc",
-  },
-  backText: {
-    color: "#000",
+    alignItems: 'center',
+    marginRight: 10,
   },
   startButton: {
-    padding: 10,
+    flex: 1,
+    padding: 15,
     backgroundColor: "#ffcc00",
+    alignItems: 'center',
+    marginLeft: 10,
   },
-  startText: {
+  disabledButton: {
+    backgroundColor: '#666',
+  },
+  buttonText: {
     color: "#000",
+    fontWeight: 'bold',
   },
 });
 
