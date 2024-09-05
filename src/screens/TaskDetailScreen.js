@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,TextInput } from 'react-native';
 import axios from 'axios';
+import {Picker} from '@react-native-picker/picker';
+import { RadioButton } from 'react-native-paper';
 
 const InputFormTaskInputType = {
   Label: 0,
@@ -11,25 +13,71 @@ const InputFormTaskInputType = {
   PF: 5,
 };
 
-const TaskDetailScreen = ({ navigation }) => {
+
+const TaskDetailScreen = ({ navigation, route }) => {
   const [tasks, setTasks] = useState([]);
+  const [taskStatuses, setTaskStatuses] = useState({});
+  const [taskResponses, setTaskResponses] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-  const [isChecked, setIsChecked] = useState(true); // Set initial state to true
+  const { assignmentId } = route.params;
+  const [Enable , setEnable]  = useState("courses");
+  const [selectedValue, setSelectedValue] = useState('');
+  const [pfValue, setPfValue] = useState(null);
+  
 
+
+  
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await axios.get('http://gybeapis-v32.westus.azurecontainer.io/api/Assignment/AssignmentTasks/14');
-        console.log('API response:', JSON.stringify(response.data, null, 2));
+        const response = await axios.get(`http://gybeapis-v34.westus.azurecontainer.io/api/Assignment/AssignmentTasksNew/${assignmentId}`);
         
-        const fetchedTasks = response.data.map(task => ({
-          id: task.taskAssignmentId,
-          title: task.inputFormTaskField.detail,
-          inputType: task.inputFormTaskField.inputType,
+        const fetchedTasks = response.data.tasks.map(task => ({
+          id: task.inputFormTaskID,
+          title: task.name,
+          detail: task.fields[0].detail,
+          inputType: 3,
+          sequence: task.taskSequence,
         }));
-        console.log('Processed tasks:', JSON.stringify(fetchedTasks, null, 2));
+
         setTasks(fetchedTasks);
+        
+        // Initialize all task statuses to false (uncompleted)
+        const initialStatuses = fetchedTasks.reduce((acc, task) => {
+          acc[task.id] = false;
+          return acc;
+        }, {});
+        setTaskStatuses(initialStatuses);
+
+        // Initialize task responses
+        const initialResponses = fetchedTasks.reduce((acc, task)  => {
+          switch (task.inputType) {
+          
+            case InputFormTaskInputType.CheckBox:
+              acc[task.id] = { status: false}
+              break;
+            case InputFormTaskInputType.TextBox:
+              acc[task.id] = { taskResponses: '' };
+              break;
+          
+            case InputFormTaskInputType.DropDown:
+              acc[task.id] = { taskResponses: '' };
+              break;
+            
+            case InputFormTaskInputType.RadioButton:
+              acc[task.id] = { taskResponses: '' };
+              break;
+            case InputFormTaskInputType.PF:
+              acc[task.id] = { pfValue: "fail" };
+              break;
+          }
+          
+          return acc;
+        
+        },
+         {});
+        setTaskResponses(initialResponses);
       } catch (error) {
         console.error('Error fetching tasks:', error);
       } finally {
@@ -40,55 +88,83 @@ const TaskDetailScreen = ({ navigation }) => {
     fetchTasks();
   }, []);
 
+
   const handleNextTask = () => {
     if (currentTaskIndex < tasks.length - 1) {
       setCurrentTaskIndex(prevIndex => prevIndex + 1);
-      setIsChecked(true);  // Ensure checkbox is checked when changing tasks
     }
   };
 
-  const handleTickPress = async () => {
+  const handlePress = async () => { 
     const currentTask = tasks[currentTaskIndex];
+    console.log('Current task:', currentTask.inputType);
     if (!currentTask) return;
+      const newStatus = !taskStatuses[currentTask.id];
+      console.log('New status:', newStatus);
+    try {
+      setTaskStatuses(prevStatuses => ({
+        ...prevStatuses,
+        [currentTask.id]: newStatus
+      }));
+
+      setTaskResponses(prevResponses => ({
+        ...prevResponses,
+        [currentTask.id]: { ...prevResponses[currentTask.id], status: newStatus }
+      }));
+      console.log(`Task ${currentTask.id} status updated to: ${newStatus}`);
+      if (currentTaskIndex === tasks.length - 1) {
+        // await submitFinalResponse();
+        navigation.navigate('Task', { completedTaskId: assignmentId });
+      }
+
+      
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }}  
+
+    // const handleInputChange = (value) => {
+    //   const currentTask = tasks[currentTaskIndex];
+    //   if (!currentTask) return;
   
+    //   setTaskResponses(prevResponses => ({
+    //     ...prevResponses,
+    //     [currentTask.id]: { ...prevResponses[currentTask.id], value: value }
+    //   }));
+  
+    //   console.log(`Task ${currentTask.id} status updated to: ${value}`);
+  
+    // };
+
+
+  const submitFinalResponse = async () => {
     try {
       const response = await axios.post(
-        `http://gybeapis-v32.westus.azurecontainer.io/api/Assignment/UpdateAssignedTaskAfterCompletion?taskAssignmentId=${currentTask.id}&assignedTaskCompletionData=test`,
-        {},
+        `http://gybeapis-v33.westus.azurecontainer.io/api/Assignment/UpdateAssignedTaskAfterCompletion?taskAssignmentId=${assignmentId}`,
+        {
+          response: taskResponses
+        },
         {
           headers: {
-            'accept': '/'
+            'accept': '/',
+            'Content-Type': 'application/json'
           }
         }
       );
-  
+
       if (response.status === 200) {
-        console.log('Task update response:', response.data);
-        
-        if (currentTaskIndex === tasks.length - 1) {
-          // If it's the last task, navigate to Task screen with the completed task ID
-          console.log('Navigating back to TaskScreen with completedTaskId:', currentTask.id);
-          navigation.navigate('Task', { completedTaskId: 1 });
-        } else {
-          // If it's not the last task, move to the next task
-          handleNextTask();
-        }
+        console.log('Final response submitted successfully');
+        navigation.navigate('Task', { completedTaskId: assignmentId });
       } else {
         console.error('Unexpected response status:', response.status);
-        // Handle unexpected status codes here
       }
     } catch (error) {
-      console.error('Error updating task:', error);
-      // You might want to show an error message to the user here
+      console.error('Error submitting final response:', error);
     }
   };
-
-
 
   const handlePreviousTask = () => {
     if (currentTaskIndex > 0) {
       setCurrentTaskIndex(prevIndex => prevIndex - 1);
-      setIsChecked(true);  // Ensure checkbox is checked when changing tasks
     }
   };
 
@@ -101,21 +177,97 @@ const TaskDetailScreen = ({ navigation }) => {
   }
 
   const currentTask = tasks[currentTaskIndex];
-  console.log('Current task:', JSON.stringify(currentTask, null, 2));
-  console.log('Current task index:', currentTaskIndex);
-  console.log('Total tasks:', tasks.length);
+
 
   const isLastTask = currentTaskIndex === tasks.length - 1;
+  const taskResponse = taskResponses[currentTask?.id] || {};
 
+
+  const TaskInput = ({ inputType }) => {
+  
+    switch (inputType) {
+      case InputFormTaskInputType.TextBox:
+        return (
+          <View style={styles.inputContainer}>
+          <TextInput
+          style={styles.textInput}
+          value={taskResponse.value || ''}
+          // onChangeText={handleInputChange}
+          placeholder="Enter text"
+        />
+        </View>
+        );
+      case InputFormTaskInputType.DropDown:
+        return (
+          <View style={styles.inputContainer}>
+          <Picker
+          selectedValue={Enable}
+          style={styles.picker}
+          mode={"dialog"}
+          onValueChange={(itemValue) => setEnable(itemValue)}
+        >
+          <Picker.Item label="Select an option" value="" />
+          <Picker.Item label="Option 1" value="option1" />
+          <Picker.Item label="Option 2" value="option2" />
+          <Picker.Item label="Option 3" value="option3" />
+        </Picker>
+        </View>
+        );
+      case InputFormTaskInputType.CheckBox:
+        return (
+          <TouchableOpacity style={styles.inputContainer}>
+           <Text style={styles.checkMark}>✓</Text> 
+           
+          </TouchableOpacity>
+        );
+        case InputFormTaskInputType.RadioButton:
+          return (
+            <View style={styles.inputContainer}>
+              <RadioButton.Group
+                onValueChange={(value) => setSelectedValue(value)}
+                value={selectedValue}
+              >
+                {['Option 1', 'Option 2', 'Option 3'].map((option) => (
+                  <View key={option} style={styles.radioButton}>
+                    <RadioButton.Android value={option} color="#fff" />
+                    <Text style={styles.radioText}>{option}</Text>
+                  </View>
+                ))}
+              </RadioButton.Group>
+            </View>
+          );
+      case InputFormTaskInputType.PF:
+        return (
+          <View style={styles.pfContainer}>
+            <TouchableOpacity
+              style={[styles.passButton, pfValue === 'Pass' && styles.pfButtonSelected]}
+              // onPress={() => handlePFSelect('Pass')}
+            >
+              <Text style={[styles.pfButtonText, pfValue === 'Pass' && styles.pfButtonTextSelected]}>Pass</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.failButton, pfValue === 'Fail' && styles.pfButtonSelected]}
+              // onPress={() => handlePFSelect('Fail')}
+            >
+              <Text style={[styles.pfButtonText, pfValue === 'Fail' && styles.pfButtonTextSelected]}>Fail</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      default:
+        return <Text>{value}</Text>;
+    }
+  };
+  
+  
   return (
     <View style={styles.container}>
       <View style={styles.greetingBox}>
-        <Text style={styles.greeting}>Assembly Steps</Text>
-        <Text style={styles.QueueTxt}>Step 1</Text>
+        <Text style={styles.QueueTxt}>{currentTask?.title}</Text>
+        <Text style={styles.greeting}>Step {currentTask?.sequence + 1}</Text>
       </View>
       <View style={styles.tasksWrapper}>
         <View key={currentTask?.id} style={styles.taskContainer}>
-          <Text style={styles.taskTitle}>{currentTask?.title}</Text>
+          <Text style={styles.taskDetail}>{currentTask?.detail}</Text>
         </View>
       </View>
       <View style={styles.navigationContainer}>
@@ -131,29 +283,15 @@ const TaskDetailScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
       <View style={styles.buttonContainer}>
-        {currentTask?.inputType === InputFormTaskInputType.PF ? (
-          <>
-            <TouchableOpacity style={styles.passButton} onPress={() => console.log('Pass button pressed')}>
-              <Text style={styles.passText}>Fail</Text>
-            </TouchableOpacity>
-            {/* <View style={styles.verticalSeparator} /> */}
-            <TouchableOpacity style={styles.failButton} onPress={() => console.log('Fail button pressed')}>
-              <Text style={styles.failText}>Pass</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Text style={styles.backText}>{'BACK'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.tickButton} 
-              onPress={handleTickPress}
-            >
-              {isChecked ? <Text style={styles.checkMark}>✓</Text> : null}
-            </TouchableOpacity>
-          </>
-        )}
+    
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>{'BACK'}</Text>
+        </TouchableOpacity>
+        <View style={styles.verticalBorder} />
+        
+        <TaskInput inputType={currentTask?.inputType} />
+
+  
       </View>
     </View>
   );
@@ -175,22 +313,22 @@ const styles = StyleSheet.create({
     height: 120,
     top: 60,
     backgroundColor: "#CAC3C3", 
-},
-greeting: {
+  },
+  greeting: {
     textAlign: "center",
     width: 191,
     height: 27,
     fontStyle: "normal",
     fontWeight: "bold",
     fontSize: 25,
-    lineHeight: 27, // Adjusted to match the height of the text
+    lineHeight: 27,
     marginTop: 10,
-    marginBottom:60,
-},
+    marginBottom: 60,
+  },
   QueueTxt: {
     position: "absolute",
     top: 70,
-    fontFamily: 'Jomhuria-Regular', 
+  
     fontStyle: "normal",
     fontWeight: "bold",
     fontSize: 40,
@@ -208,8 +346,8 @@ greeting: {
     justifyContent: "center",
     width: "100%",
   },
-  taskTitle: {
-    fontSize: 40,
+  taskDetail: {
+    fontSize: 35,
     color: "white",
     textAlign: "center",
   },
@@ -235,130 +373,139 @@ greeting: {
   disabledNavText: {
     color: "#888",
   },
+
   buttonContainer: {
+   
     position: 'absolute',
-    bottom: 100, // Move the buttons upwards
+    bottom: 10,
     flexDirection: "row",
     justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 0, // Remove horizontal padding
+    width: "140%",
+    paddingHorizontal: 0,
     borderTopWidth: 2,
-    borderColor: '#fff',
-    paddingTop: 0, // Remove top padding
+    borderColor: 'white',
+    paddingTop: 10,
+    
+    
+  },
 
-},
+ 
+
   backButton: {
-    flex: 1,
-    paddingVertical: 20, // Increase the vertical padding
+    paddingVertical: 40,
     backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
-    borderRightWidth: 2,
-    borderColor: '#fff',
+    marginLeft: 30,
+    width: '30%', // Adjust as needed
   },
   backText: {
     color: "#fff",
     fontSize: 20,
-    marginRight: 40,
-    // textAlign: "center", // Center the text horizontally
   },
+
+  verticalBorder: {
+    width: 1,
+    backgroundColor: '#fff',
+    marginVertical: -10, // Adjust to control border height
+  },
+
   tickButton: {
-    flex: 2, // Give more space to the tick button
-    paddingVertical: 20, // Increase the vertical padding
-    backgroundColor: "#000",
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 10,
+    right: 80,
+
   },
   checkMark: {
-    color: '#ffF', // Change the color of the check mark
-    fontSize: 80, // Make the check mark bigger
+    color: 'white',
+    fontSize: 80,
     fontWeight: 'bold',
+    textAlign: 'center', // Center the text horizontally
+    textAlignVertical: 'center', // Center the text vertically (for Android)
+  },
+
+  inputContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 30,
+    right: 20,
+  },
+
+  picker: {
+    width: '90%',
+    height: 50,
+    backgroundColor: 'white',
+    marginTop: 10,
+  },
+  
+  textInput: {
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 5,
+    width: '90%',  // Adjust width as needed
+    height: 80,    // Set a fixed height
+    textAlign: 'center',  // Center the text inside the input
+  },
+
+  radioButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    right: 10,
+  },
+  radioText: {
+    fontSize: 20,
+    marginLeft: 30,
+    color: '#fff',
+  },
+  pfContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 10,
+  },
+  pfContainer: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    width: '50%',
   },
   passButton: {
-    flex: 1,
-    backgroundColor: 'red',
-    paddingVertical: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // marginRight: 10,
-    marginLeft: -50,
-    width: '100%',
-    height: '100%',
-  },
-  passText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  failButton: {
-    flex: 1,
     backgroundColor: 'green',
-    paddingVertical: 20,
-    justifyContent: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginVertical: 5,
+    borderRadius: 5,
     alignItems: 'center',
-    // marginLeft: 10,
-    marginRight: -50,
+    alignContent: 'center',
+    right: 10,
+    width: '80%',
   },
-  failText: {
+
+  failButton: {
+    backgroundColor: 'red',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginVertical: 5,
+    borderRadius: 5,
+    alignItems: 'center',
+    alignContent: 'center',
+    right: 10,
+    width: '80%',
+  },
+  pfButtonSelected: {
+    backgroundColor: '#ffcc00',
+  },
+  pfButtonText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
+
   },
-  verticalSeparator: {
-    width: 2,
-    backgroundColor: '#fff',
-  },
-  labelButton: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#ffcc00',
-  },
-  textBoxButton: {
-    width: '80%',
-    height: '60%',
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#000',
-  },
-  dropDownButton: {
-    width: '80%',
-    height: '60%',
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkBoxButton: {
-    width: 30,
-    height: 30,
-    borderWidth: 2,
-    borderColor: '#000',
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioButtonOutline: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioButtonInner: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#000',
-  },
-  defaultButton: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#ffcc00',
+  pfButtonTextSelected: {
+    color: '#000',
+
   },
 });
 
