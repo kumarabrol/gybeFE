@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard } from 'react-native';
 import axios from 'axios';
-import {Picker} from '@react-native-picker/picker';
+import { Picker } from '@react-native-picker/picker';
+import { useFocusEffect } from '@react-navigation/native';
 
 const InputFormTaskInputType = {
   Label: 0,
@@ -12,39 +13,67 @@ const InputFormTaskInputType = {
   PF: 5,
 };
 
+const { width, height } = Dimensions.get('window');
+
 const TaskDetailScreen = ({ navigation, route }) => {
   const [tasks, setTasks] = useState([]);
   const [taskResponses, setTaskResponses] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { assignmentId } = route.params;
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const response = await axios.get(`http://gybeapis-v35.westus.azurecontainer.io/api/Assignment/AssignmentTasksNew/16`);
-        setTasks(response.data.tasks);
-        
-        const initialResponses = response.data.tasks.reduce((acc, task) => {
-          task.fields.forEach(field => {
-            acc[field.inputFormTaskFieldID] = { value: '', status: false };
-          });
-          return acc;
-        }, {});
-        setTaskResponses(initialResponses);
-      } catch (error) {
-        console.error('Error fetching tasks:', error);
-        Alert.alert('Error', 'Failed to fetch tasks. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
 
-    fetchTasks();
-  }, [assignmentId]);
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchTasks = async () => {
+        try {
+          const response = await axios.get(`http://gybeapis-v35.westus.azurecontainer.io/api/Assignment/AssignmentTasksNew/16`);
+          setTasks(response.data.tasks);
+          
+          const initialResponses = response.data.tasks.reduce((acc, task) => {
+            task.fields.forEach(field => {
+              acc[field.inputFormTaskFieldID] = { 
+                value: field.inputFormTaskInputType === InputFormTaskInputType.CheckBox ? false : '', 
+                status: false 
+              };
+            });
+            return acc;
+          }, {});
+          setTaskResponses(initialResponses);
+        } catch (error) {
+          console.error('Error fetching tasks:', error);
+          Alert.alert('Error', 'Failed to fetch tasks. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchTasks();
+      return () => {
+        // Clean up function if needed
+      };
+    }, [assignmentId])
+  );
 
   const handleInputChange = (fieldId, value) => {
+    console.log('Field ID:', fieldId, 'Value:', value);
     setTaskResponses(prevResponses => ({
       ...prevResponses,
       [fieldId]: { value: value, status: true }
@@ -75,7 +104,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
           fieldSequence: field.fieldSequence,
           inputFormTaskInputType: field.inputFormTaskInputType,
           detail: field.detail,
-          response: taskResponses[field.inputFormTaskFieldID]?.value || '',
+          response: taskResponses[field.inputFormTaskFieldID]?.value.toString(),
           inputFormCellLocation: field.inputFormCellLocation || ''
         }))
       }));
@@ -131,13 +160,11 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }
   };
 
-
-
   const renderField = (field) => {
     switch (field.inputFormTaskInputType) {
       case InputFormTaskInputType.Label:
         return (
-          <View key={field.inputFormTaskFieldID}>
+          <View key={field.inputFormTaskFieldID} style={styles.fieldContainer}>
             <Text style={styles.labelText}>{field.detail}</Text>
           </View>
         );
@@ -145,20 +172,22 @@ const TaskDetailScreen = ({ navigation, route }) => {
         return (
           <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { width: width * 0.6 , height: 60 }] }
               placeholder={field.detail}
               value={taskResponses[field.inputFormTaskFieldID]?.value}
               onChangeText={(text) => handleInputChange(field.inputFormTaskFieldID, text)}
+              multiline={true}
+              numberOfLines={4}
             />
           </View>
         );
       case InputFormTaskInputType.DropDown:
         const options = field.detail.split(';').map(option => option.trim());
         return (
-          <View key={field.inputFormTaskFieldID}>
+          <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
             <Picker
               selectedValue={taskResponses[field.inputFormTaskFieldID]?.value}
-              style={styles.dropfieldContainer}
+              style={[styles.dropfieldContainer, { width: width * 0.8 }]}
               mode="dialog"
               onValueChange={(itemValue) => handleInputChange(field.inputFormTaskFieldID, itemValue)}
             >
@@ -169,26 +198,26 @@ const TaskDetailScreen = ({ navigation, route }) => {
             </Picker>
           </View>
         );
-      case InputFormTaskInputType.CheckBox:
-        return (
-          <TouchableOpacity 
-            style={styles.fieldContainer} 
-            key={field.inputFormTaskFieldID}
-            onPress={() => handleInputChange(field.inputFormTaskFieldID, !taskResponses[field.inputFormTaskFieldID]?.value)}
-          >
-            <Text style={styles.checkMark}>
-              {taskResponses[field.inputFormTaskFieldID]?.value ? '✓' : ''}
-            </Text>
-            <Text style={styles.checkboxLabel}>{field.detail}</Text>
-          </TouchableOpacity>
-        );
+        case InputFormTaskInputType.CheckBox:
+          return (
+            <TouchableOpacity 
+              style={styles.fieldContainer} 
+              key={field.inputFormTaskFieldID}
+              onPress={() => handleInputChange(field.inputFormTaskFieldID, !taskResponses[field.inputFormTaskFieldID]?.value)}
+            >
+              <Text style={styles.checkMark}>
+                {taskResponses[field.inputFormTaskFieldID]?.value ? "✓" : "✓"}
+              </Text>
+              <Text style={styles.checkboxLabel}></Text>
+            </TouchableOpacity>
+          );
       case InputFormTaskInputType.Button:
         return (
           <View style={styles.buttonContainer} key={field.inputFormTaskFieldID}>
             {field.detail.split(';').map((option, index) => (
               <TouchableOpacity
                 key={index}
-                style={styles.button}
+                style={[styles.button, { width: width * 0.8 }]}
                 onPress={() => handleInputChange(field.inputFormTaskFieldID, option)}
               >
                 <Text style={styles.buttonText}>{option}</Text>
@@ -206,7 +235,8 @@ const TaskDetailScreen = ({ navigation, route }) => {
                   key={index}
                   style={[
                     styles.pfButton,
-                    taskResponses[field.inputFormTaskFieldID]?.value === option && styles.pfButtonSelected
+                    taskResponses[field.inputFormTaskFieldID]?.value === option && styles.pfButtonSelected,
+                    { width: (width * 0.8) / field.detail.split(';').length }
                   ]}
                   onPress={() => handleInputChange(field.inputFormTaskFieldID, option)}
                 >
@@ -236,41 +266,44 @@ const TaskDetailScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>{currentTask?.name}</Text>
-        <Text style={styles.subHeaderText}>Task {currentTaskIndex + 1} of {tasks.length}</Text>
       </View>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
         {currentTask?.fields.map((field) => renderField(field))}
       </ScrollView>
-      <View style={styles.navigationContainer}>
-        <TouchableOpacity 
-          style={[styles.navButton, currentTaskIndex === 0 && styles.disabledNavButton]} 
-          onPress={handlePreviousTask}
-          disabled={currentTaskIndex === 0}
-        >
-          <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
+      {!keyboardVisible && (
+        <View style={styles.navigationContainer}>
+          <TouchableOpacity 
+            style={[styles.navButton, currentTaskIndex === 0 && styles.disabledNavButton]} 
+            onPress={handlePreviousTask}
+            disabled={currentTaskIndex === 0}
+          >
+            <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
+          </TouchableOpacity>
+          {isLastTask ? (
+            <TouchableOpacity 
+              style={styles.submitButton} 
+              onPress={handleSubmit}
+              disabled={submitting}
+            >
+              <Text style={styles.submitButtonText}>
+                {submitting ? 'Submitting...' : 'Submit All Responses'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={styles.navButton}
+              onPress={handleNextTask}
+            >
+              <Text style={styles.navText}>{'>'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+      {!keyboardVisible && (
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>BACK</Text>
         </TouchableOpacity>
-        {isLastTask ? (
-          <TouchableOpacity 
-            style={styles.submitButton} 
-            onPress={handleSubmit}
-            disabled={submitting}
-          >
-            <Text style={styles.submitButtonText}>
-              {submitting ? 'Submitting...' : 'Submit All Responses'}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={handleNextTask}
-          >
-            <Text style={styles.navText}>{'>'}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>BACK</Text>
-      </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -304,23 +337,16 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    padding: 20,
+    padding: 0,
   },
   fieldContainer: {
-    width: '90%',
-    left: 20,
-    marginTop: 80,
-    backgroundColor: 'black',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-
-
   dropfieldContainer: {
-    width: '90%',
-    left: 20,
-    marginTop: 80,
     backgroundColor: 'white',
+    borderRadius: 5,
   },
-  
   fieldLabel: {
     color: '#fff',
     fontSize: 18,
@@ -330,53 +356,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 10,
     borderRadius: 5,
-    fontSize: 35,
-  },
-  dropdownButton: {
-    backgroundColor: '#ffcc00',
-    padding: 15,
-    borderRadius: 5,
-  },
-  dropdownButtonText: {
     fontSize: 16,
-    color: '#000',
-    textAlign: 'center',
+    textAlignVertical: 'top',
   },
-  checkboxButton: {
-    backgroundColor: '#ffcc00',
-    padding: 15,
-    borderRadius: 5,
-    marginVertical: 5,
+  checkMark: {
+    color: 'white',
+    fontSize: 60,
+    fontWeight: 'bold',
   },
-  checkboxButtonText: {
-    fontSize: 16,
-    color: '#000',
-    textAlign: 'center',
-  },
-  radioButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 5,
-  },
-  radio: {
-    height: 24,
-    width: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  radioFill: {
-    height: 12,
-    width: 12,
-    borderRadius: 6,
-    backgroundColor: '#fff',
-  },
-  radioText: {
+  checkboxLabel: {
     color: '#fff',
     fontSize: 16,
+    marginLeft: 10,
+  },
+  button: {
+    backgroundColor: '#ffcc00',
+    padding: 15,
+    borderRadius: 5,
+    marginVertical: 5,
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    color: '#000',
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    alignItems: 'center',
+    marginTop: 20,
   },
   pfButtonContainer: {
     flexDirection: 'row',
@@ -387,7 +394,6 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 5,
     marginHorizontal: 5,
-    flex: 1,
   },
   pfButtonText: {
     color: '#000',
@@ -397,6 +403,7 @@ const styles = StyleSheet.create({
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 20,
   },
@@ -428,53 +435,10 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 20,
   },
-  
   labelText: {
     color: '#fff',
     fontSize: 40,
-   
-    alignContent: 'center',
     textAlign: 'center',
-  },
-
-  inputContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    paddingHorizontal: 30,
-  },
-  
-  checkMark: {
-    color: 'white',
-    fontSize: 80,
-    fontWeight: 'bold',
-    textAlign: 'center', // Center the text horizontally
-    textAlignVertical: 'center', // Center the text vertically (for Android)
-  },
-  button: {
-    backgroundColor: '#ffcc00',
-    padding: 15,
-    borderRadius: 5,
-    marginVertical: 5,
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 16,
-    color: '#000',
-    textAlign: 'center',
-  },
-
-  buttonContainer: {
-   marginTop: 20,
-  },
-
-  navigationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
   },
   submitButton: {
     backgroundColor: "#ffcc00",
@@ -495,8 +459,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
   },
-  
 });
-
 
 export default TaskDetailScreen;
