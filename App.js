@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from './src/screens/HomeScreen'; // Adjust the path as necessary
 import TaskScreen from './src/screens/TaskScreen';
 import TaskDatailScreen from './src/screens/TaskDetailScreen';
+import DetailScreen from './src/screens/Detail';                           
 
 const Stack = createStackNavigator();
 
@@ -13,6 +14,7 @@ function App() {
       <Stack.Navigator initialRouteName="Home">
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Task" component={TaskScreen} />
+        <Stack.Screen name="Detail" component={DetailScreen} />
         <Stack.Screen name="TaskDetail" component={TaskDatailScreen} />
       </Stack.Navigator>
     </NavigationContainer>

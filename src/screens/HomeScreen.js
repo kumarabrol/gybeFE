@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, View, StyleSheet } from 'react-native';
-import { AuthManager } from './authManager'; // Adjust the path as necessary
+// import { AuthManager } from './authManager'; // Adjust the path as necessary
 
 const HomeScreen = ({ navigation }) => {
   const handleSignIn = async () => {
@@ -19,6 +19,9 @@ const HomeScreen = ({ navigation }) => {
     </View>
   );
 };
+
+
+
 
 const styles = StyleSheet.create({
   container: {
