@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const InputFormTaskInputType = {
   Label: 0,
@@ -11,6 +12,7 @@ const InputFormTaskInputType = {
   CheckBox: 3,
   Button: 4,
   PF: 5,
+  CaptureImage: 6, 
 };
 
 const { width, height } = Dimensions.get('window');
@@ -44,7 +46,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
     React.useCallback(() => {
       const fetchTasks = async () => {
         try {
-          const response = await axios.get(`http://gybeapis-v35.westus.azurecontainer.io/api/Assignment/AssignmentTasksNew/16`);
+          const response = await axios.get(`http://gybeapis-v36.westus.azurecontainer.io/api/Assignment/AssignmentTasksNew/16`);
           setTasks(response.data.tasks);
           
           const initialResponses = response.data.tasks.reduce((acc, task) => {
@@ -80,6 +82,13 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }));
   };
 
+
+  const handleCaptureImage = (fieldId) => {
+    // TODO: Implement image capture functionality
+    console.log('Capture image for field:', fieldId);
+    Alert.alert('Image Capture', 'Image capture functionality to be implemented.');
+  };
+
   const handleNextTask = () => {
     if (currentTaskIndex < tasks.length - 1) {
       setCurrentTaskIndex(prevIndex => prevIndex + 1);
@@ -92,7 +101,32 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleSubmit = async () => {
+
+
+
+
+
+
+  const handleBackPress = () => {
+    Alert.alert(
+      "Confirm Navigation",
+      "Are you sure you want to go back? Your responses will be submitted.",
+      [
+        {
+          text: "No",
+          onPress: () => console.log("Navigation cancelled"),
+          style: "cancel"
+        },
+        { 
+          text: "Yes", 
+          onPress: handleSubmitAndGoBack
+        }
+      ],
+      { cancelable: false }
+    );
+  };
+
+  const handleSubmitAndGoBack = async () => {
     setSubmitting(true);
     try {
       const formattedTasks = tasks.map(task => ({
@@ -118,7 +152,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
       console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       const response = await axios.put(
-        'http://gybeapis-v35.westus.azurecontainer.io/api/Assignment/RecordAssignmentWork',
+        'http://gybeapis-v36.westus.azurecontainer.io/api/Assignment/RecordAssignmentWork',
         payload,
         {
           headers: {
@@ -129,8 +163,9 @@ const TaskDetailScreen = ({ navigation, route }) => {
       );
 
       console.log('Submit response:', response.data);
-      Alert.alert('Success', 'Assignment submitted successfully!');
-      navigation.goBack();
+      Alert.alert('Success', 'Responses submitted successfully!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
     } catch (error) {
       console.error('Error submitting responses:', error);
       
@@ -246,6 +281,21 @@ const TaskDetailScreen = ({ navigation, route }) => {
             </View>
           </View>
         );
+
+
+
+        case InputFormTaskInputType.CaptureImage:
+        return (
+          <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
+            <TouchableOpacity
+              style={styles.cameraButton}
+              onPress={() => handleCaptureImage(field.inputFormTaskFieldID)}
+            >
+              <MaterialIcons name="camera-alt" size={40} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        );
+
       default:
         return null;
     }
@@ -282,7 +332,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
           {isLastTask ? (
             <TouchableOpacity 
               style={styles.submitButton} 
-              onPress={handleSubmit}
+              onPress={handleSubmitAndGoBack}
               disabled={submitting}
             >
               <Text style={styles.submitButtonText}>
@@ -300,7 +350,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
         </View>
       )}
       {!keyboardVisible && (
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton}  onPress={handleBackPress}>
           <Text style={styles.backText}>BACK</Text>
         </TouchableOpacity>
       )}
@@ -459,6 +509,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
   },
+
+  cameraButton: {
+    backgroundColor: '#ffcc00',
+    padding: 20,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
 });
+
 
 export default TaskDetailScreen;

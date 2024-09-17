@@ -3,92 +3,92 @@ import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList }
 import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native';
 
-const TaskScreen = ({ navigation, route }) => {
-  const [assignments, setAssignments] = useState([]);
+const DetailScreen = ({ navigation, route }) => {
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
   
-  const fetchAssignments = useCallback(async () => {
+  const fetchTasks = useCallback(async () => {
     try {
-      const response = await axios.get('http://gybeapis-v36.westus.azurecontainer.io/api/Assignment/Assignments/1');
+      const response = await axios.get('http://gybeapis-v36.westus.azurecontainer.io/api/Assignment/AssignmentTasksNew/16');
       console.log('Raw API response:', JSON.stringify(response.data, null, 2));
       
-      const fetchedAssignments = response.data.map(assignment => ({
-        id: assignment.assignmentId.toString(),
-        instructions: assignment.assignmentInstructions,
-        status: assignment.assignmentStatus,
-        startDate: new Date(assignment.assignmentStartDate),
-        endDate: new Date(assignment.assignmentEndDate),
+      const fetchedTasks = response.data.tasks.map(task => ({
+        id: task.inputFormTaskID.toString(),
+        name: task.name,
+        status: 0, // Assuming 0 represents an uncompleted task
+        fields: task.fields,
       }));
       
-      console.log('Processed assignments:', JSON.stringify(fetchedAssignments, null, 2));
-      setAssignments(fetchedAssignments);
+      console.log('Processed tasks:', JSON.stringify(fetchedTasks, null, 2));
+      setTasks(fetchedTasks);
       setError(null);
     } catch (error) {
-      console.error('Error fetching assignments:', error);
-      setError('Failed to fetch assignments. Please try again later.');
+      console.error('Error fetching tasks:', error);
+      setError('Failed to fetch tasks. Please try again later.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchAssignments();
-  }, [fetchAssignments]);
+    fetchTasks();
+  }, [fetchTasks]);
 
   useFocusEffect(
     useCallback(() => {
       console.log('Screen focused. Route params:', route.params);
-      if (route.params?.completedAssignmentId) {
-        console.log('Completed assignment ID received:', route.params.completedAssignmentId);
-        setAssignments(prevAssignments => 
-          prevAssignments.map(assignment => 
-            assignment.id === route.params.completedAssignmentId.toString() 
-              ? { ...assignment, status: 3 } // Assuming 3 represents a completed assignment
-              : assignment
+      if (route.params?.completedTaskId) {
+        console.log('Completed task ID received:', route.params.completedTaskId);
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === route.params.completedTaskId
+              ? { ...task, status: 3 } // Assuming 3 represents a completed task
+              : task
           )
         );
-        setSelectedAssignmentId(null);
+        setSelectedTaskId(null);
       }
-    }, [route.params?.completedAssignmentId])
+    }, [route.params?.completedTaskId])
   );
 
-  const handleAssignmentPress = (assignmentId) => {
-    if (assignments.find(assignment => assignment.id === assignmentId).status !== 3) {
-      setSelectedAssignmentId(assignmentId);
+  const handleTaskPress = (taskId) => {
+    if (tasks.find(task => task.id === taskId).status !== 3) {
+      setSelectedTaskId(taskId);
     }
   };
 
   const handleStartPress = () => {
-    if (selectedAssignmentId) {
-      const selectedAssignment = assignments.find(assignment => assignment.id === selectedAssignmentId);
-      navigation.navigate('Detail', { 
-        assignmentId: selectedAssignmentId,
-        instructions: selectedAssignment.instructions,
+    if (selectedTaskId) {
+      const selectedTask = tasks.find(task => task.id === selectedTaskId);
+      navigation.navigate('TaskDetail', { 
+        taskId: selectedTaskId,
+        fields: selectedTask.fields,
       });
     }
   };
 
-  const renderAssignment = ({ item }) => {
-    console.log('Rendering assignment:', JSON.stringify(item, null, 2));
+  
+
+  const renderTask = ({ item }) => {
+    console.log('Rendering task:', JSON.stringify(item, null, 2));
     return (
       <TouchableOpacity
         style={[
-          styles.assignmentItem, 
-          item.status === 3 && styles.completedAssignmentItem,
-          item.id === selectedAssignmentId && styles.selectedAssignmentItem
+          styles.taskItem, 
+          item.status === 3 && styles.completedTaskItem,
+          item.id === selectedTaskId && styles.selectedTaskItem
         ]}
-        onPress={() => handleAssignmentPress(item.id)}
+        onPress={() => handleTaskPress(item.id)}
         disabled={item.status === 3}
       >
         <Text style={[
-          styles.assignmentInstructions, 
-          item.status === 3 && styles.completedAssignmentInstructions
+          styles.taskName, 
+          item.status === 3 && styles.completedTaskName
         ]}>
-          {item.instructions || 'No instructions available'}
+          {item.name}
         </Text>
-
       </TouchableOpacity>
     );
   };
@@ -113,12 +113,12 @@ const TaskScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <View style={styles.greetingBox}>
         <Text style={styles.greeting}>Hi Terry!</Text>
-        <Text style={styles.QueueTxt}>Today's job queue:</Text>
+        <Text style={styles.queueText}>Today's task queue:</Text>
       </View>
       <FlatList
-        style={styles.assignmentsWrapper}
-        data={assignments}
-        renderItem={renderAssignment}
+        style={styles.tasksWrapper}
+        data={tasks}
+        renderItem={renderTask}
         keyExtractor={item => item.id}
       />
       <View style={styles.buttonContainer}>
@@ -126,9 +126,9 @@ const TaskScreen = ({ navigation, route }) => {
           <Text style={styles.buttonText}>BACK</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.startButton, !selectedAssignmentId && styles.disabledButton]} 
+          style={[styles.startButton, !selectedTaskId && styles.disabledButton]} 
           onPress={handleStartPress}
-          disabled={!selectedAssignmentId}
+          disabled={!selectedTaskId}
         >
           <Text style={styles.buttonText}>START</Text>
         </TouchableOpacity>
@@ -159,36 +159,31 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
   },
-  assignmentsWrapper: {
+  tasksWrapper: {
     flex: 1,
   },
-  assignmentItem: {
+  taskItem: {
     backgroundColor: '#1c1c1c',
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
   },
-  completedAssignmentItem: {
+  completedTaskItem: {
     backgroundColor: '#2a2a2a',
     opacity: 0.7,
   },
-  selectedAssignmentItem: {
+  selectedTaskItem: {
     backgroundColor: '#333',
     borderColor: '#ffcc00',
     borderWidth: 2,
   },
-  assignmentInstructions: {
+  taskName: {
     fontSize: 16,
     color: 'white',
-    marginBottom: 5,
   },
-  completedAssignmentInstructions: {
+  completedTaskName: {
     color: '#888',
     textDecorationLine: 'line-through',
-  },
-  assignmentDates: {
-    fontSize: 12,
-    color: '#888',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -226,11 +221,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 });
 
-export default TaskScreen;
+export default DetailScreen;
