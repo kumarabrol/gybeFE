@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList } from 'react-native';
+import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList,ScrollView  } from 'react-native';
 import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -26,8 +26,8 @@ const TaskScreen = ({ navigation, route }) => {
       setAssignments(fetchedAssignments);
       setError(null);
     } catch (error) {
-      console.error('Error fetching assignments:', error);
-      setError('Failed to fetch assignments. Please try again later.');
+      console.error('Error fetching assignments:', error.stack);
+      setError(error.stack);
     } finally {
       setLoading(false);
     }
@@ -101,11 +101,26 @@ const TaskScreen = ({ navigation, route }) => {
     );
   }
 
+ 
   if (error) {
+    console.error('Error rendering screen:', error);
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
+      <ScrollView style={styles.container}>
+        <Text style={styles.errorText}>{error.message}</Text>
+        <View style={styles.errorDetailsContainer}>
+          <Text style={styles.errorDetailsTitle}>Error Details:</Text>
+          <Text style={styles.errorDetailsText}>{error}</Text>
+        </View>
+        {error.stack && (
+          <View style={styles.errorStackContainer}>
+            <Text style={styles.errorStackTitle}>Error Stack Trace:</Text>
+            <Text style={styles.errorStackText}>{error.stack}</Text>
+          </View>
+        )}
+        <TouchableOpacity style={styles.retryButton} onPress={fetchAssignments}>
+          <Text style={styles.buttonText}>Retry</Text>
+        </TouchableOpacity>
+      </ScrollView>
     );
   }
 
@@ -230,6 +245,47 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  errorDetailsContainer: {
+    backgroundColor: '#1c1c1c',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  errorDetailsTitle: {
+    color: '#ffcc00',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  errorDetailsText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'monospace',
+  },
+  errorStackContainer: {
+    backgroundColor: '#1c1c1c',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  errorStackTitle: {
+    color: '#ffcc00',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  errorStackText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+  retryButton: {
+    backgroundColor: '#ffcc00',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
   },
 });
 
