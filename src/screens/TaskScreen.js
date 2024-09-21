@@ -11,7 +11,7 @@ const TaskScreen = ({ navigation, route }) => {
   
   const fetchAssignments = useCallback(async () => {
     try {
-      const response = await axios.get('http://gybeapis-v36.westus.azurecontainer.io/api/Assignment/Assignments/1');
+      const response = await axios.get('https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/Assignments/1');
       console.log('Raw API response:', JSON.stringify(response.data, null, 2));
       
       const fetchedAssignments = response.data.map(assignment => ({
