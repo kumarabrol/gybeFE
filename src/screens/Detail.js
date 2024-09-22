@@ -3,11 +3,7 @@ import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList, 
 import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import { AntDesign } from '@expo/vector-icons'; // Make sure to install expo-vector-icons
-import { TbArrowBarDown } from 'react-icons/tb';
 import Icon from 'react-native-vector-icons/Ionicons'; // Use 'Ionicons' or another icon set
-
-
 
 const DRAG_THRESHOLD = 50;
 
@@ -16,13 +12,16 @@ const DetailScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
-  
+
   const pan = useRef(new Animated.ValueXY()).current;
   const arrowOpacity = useRef(new Animated.Value(1)).current;
 
   const fetchTasks = useCallback(async () => {
     try {
       const response = await axios.get('https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/16');
+      
+      
+      
       console.log('Raw API response:', JSON.stringify(response.data, null, 2));
       
       const fetchedTasks = response.data.tasks.map(task => ({
@@ -79,7 +78,6 @@ const DetailScreen = ({ navigation, route }) => {
       });
     }
 
-
     if (tasks.find(task => task.id === taskId).status !== 3) {
       setSelectedTaskId(taskId);
     }
@@ -131,20 +129,25 @@ const DetailScreen = ({ navigation, route }) => {
   }, [arrowOpacity]);
 
   const renderTask = ({ item }) => {
-    console.log('Rendering task:', JSON.stringify(item, null, 2));
+    const hasResponse = item.fields.some(field => field.response.trim() !== "");
+
     return (
       <TouchableOpacity
         style={[
-          styles.taskItem, 
-          item.status === 3 && styles.completedTaskItem,
-          item.id === selectedTaskId && styles.selectedTaskItem
+          styles.taskItem,
+          hasResponse && styles.taskWithResponse, // Green for tasks with responses
+          !hasResponse && styles.taskWithoutResponse, // Yellow for tasks without responses
+          item.status === 3 && styles.completedTaskItem, // For completed tasks
+          item.id === selectedTaskId && styles.selectedTaskItem // Highlight selected task
         ]}
         onPress={() => handleStartPress(item.id)}
-        disabled={item.status === 3}
+        disabled={hasResponse || item.status === 3} // Disable if the task has response or is completed
       >
         <Text style={[
-          styles.taskName, 
-          item.status === 3 && styles.completedTaskName
+          styles.taskName,
+          hasResponse && styles.taskWithResponseText,
+          !hasResponse && styles.taskWithoutResponseText,
+          item.status === 3 && styles.completedTaskName // Line-through for completed tasks
         ]}>
           {item.name}
         </Text>
@@ -176,9 +179,9 @@ const DetailScreen = ({ navigation, route }) => {
           { transform: [{ translateY: pan.y }] }
         ]}
       >
-      <View style={styles.arrowContainer}>
-       <Icon  name="arrow-down" size={24} color="#ffcc00" />
-      </View>
+        <View style={styles.arrowContainer}>
+          <Icon name="arrow-down" size={24} color="#ffcc00" />
+        </View>
         <View style={styles.greetingBox}>
           <Text style={styles.greeting}>Hi Terry!</Text>
           <Text style={styles.queueText}>Today's task queue:</Text>
@@ -189,7 +192,6 @@ const DetailScreen = ({ navigation, route }) => {
           renderItem={renderTask}
           keyExtractor={item => item.id}
         />
-       
       </Animated.View>
     );
   };
@@ -246,9 +248,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
   },
-  completedTaskItem: {
-    backgroundColor: '#2a2a2a',
-    opacity: 0.7,
+  taskWithResponse: {
+    backgroundColor: 'green', // Green for tasks with response
+  },
+  taskWithoutResponse: {
+    backgroundColor: 'yellow', // Yellow for tasks without response
   },
   selectedTaskItem: {
     backgroundColor: '#333',
@@ -259,30 +263,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'white',
   },
+  taskWithResponseText: {
+    color: 'white', // White text for tasks with response
+  },
+  taskWithoutResponseText: {
+    color: 'black', // Black text for tasks without response
+  },
+  completedTaskItem: {
+    backgroundColor: '#2a2a2a',
+    opacity: 0.7,
+  },
   completedTaskName: {
     color: '#888',
     textDecorationLine: 'line-through',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  startButton: {
-    flex: 1,
-    backgroundColor: '#ffcc00',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  disabledButton: {
-    backgroundColor: '#666',
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   errorText: {
     color: 'red',
