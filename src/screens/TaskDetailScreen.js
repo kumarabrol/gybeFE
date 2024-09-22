@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard, Animated } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
+import { AntDesign } from '@expo/vector-icons'; 
 
 const InputFormTaskInputType = {
   Label: 0,
@@ -16,6 +18,7 @@ const InputFormTaskInputType = {
 };
 
 const { width, height } = Dimensions.get('window');
+const DRAG_THRESHOLD = 100;
 
 const TaskDetailScreen = ({ navigation, route }) => {
   const [tasks, setTasks] = useState([]);
@@ -25,6 +28,8 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const [submitting, setSubmitting] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { assignmentId } = route.params;
+
+  const pan = useRef(new Animated.ValueXY()).current;
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -46,7 +51,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
     React.useCallback(() => {
       const fetchTasks = async () => {
         try {
-          const response = await axios.get(`http://gybeapis-v36.westus.azurecontainer.io/api/Assignment/AssignmentTasksNew/16`);
+          const response = await axios.get(`https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/16`);
           setTasks(response.data.tasks);
           
           const initialResponses = response.data.tasks.reduce((acc, task) => {
@@ -74,6 +79,44 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }, [assignmentId])
   );
 
+  const handleGesture = Animated.event(
+    [{ nativeEvent: { translationY: pan.y } }],
+    { useNativeDriver: false }
+  );
+
+  const handleStateChange = ({ nativeEvent }) => {
+    if (nativeEvent.oldState === State.ACTIVE) {
+      if (nativeEvent.translationY > DRAG_THRESHOLD) {
+        Alert.alert(
+          "Confirm Navigation",
+          "Are you sure you want to go back? Your responses will be submitted.",
+          [
+            {
+              text: "No",
+              onPress: () => {
+                Animated.spring(pan, {
+                  toValue: { x: 0, y: 0 },
+                  useNativeDriver: false,
+                }).start();
+              },
+              style: "cancel"
+            },
+            { 
+              text: "Yes", 
+              onPress: handleSubmitAndGoBack
+            }
+          ],
+          { cancelable: false }
+        );
+      } else {
+        Animated.spring(pan, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: false,
+        }).start();
+      }
+    }
+  };
+
   const handleInputChange = (fieldId, value) => {
     console.log('Field ID:', fieldId, 'Value:', value);
     setTaskResponses(prevResponses => ({
@@ -82,9 +125,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }));
   };
 
-
   const handleCaptureImage = (fieldId) => {
-    // TODO: Implement image capture functionality
     console.log('Capture image for field:', fieldId);
     Alert.alert('Image Capture', 'Image capture functionality to be implemented.');
   };
@@ -99,31 +140,6 @@ const TaskDetailScreen = ({ navigation, route }) => {
     if (currentTaskIndex > 0) {
       setCurrentTaskIndex(prevIndex => prevIndex - 1);
     }
-  };
-
-
-
-
-
-
-
-  const handleBackPress = () => {
-    Alert.alert(
-      "Confirm Navigation",
-      "Are you sure you want to go back? Your responses will be submitted.",
-      [
-        {
-          text: "No",
-          onPress: () => console.log("Navigation cancelled"),
-          style: "cancel"
-        },
-        { 
-          text: "Yes", 
-          onPress: handleSubmitAndGoBack
-        }
-      ],
-      { cancelable: false }
-    );
   };
 
   const handleSubmitAndGoBack = async () => {
@@ -152,7 +168,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
       console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       const response = await axios.put(
-        'http://gybeapis-v36.westus.azurecontainer.io/api/Assignment/RecordAssignmentWork',
+        'https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/RecordAssignmentWork',
         payload,
         {
           headers: {
@@ -233,19 +249,19 @@ const TaskDetailScreen = ({ navigation, route }) => {
             </Picker>
           </View>
         );
-        case InputFormTaskInputType.CheckBox:
-          return (
-            <TouchableOpacity 
-              style={styles.fieldContainer} 
-              key={field.inputFormTaskFieldID}
-              onPress={() => handleInputChange(field.inputFormTaskFieldID, !taskResponses[field.inputFormTaskFieldID]?.value)}
-            >
-              <Text style={styles.checkMark}>
-                {taskResponses[field.inputFormTaskFieldID]?.value ? "✓" : "✓"}
-              </Text>
-              <Text style={styles.checkboxLabel}></Text>
-            </TouchableOpacity>
-          );
+      case InputFormTaskInputType.CheckBox:
+        return (
+          <TouchableOpacity 
+            style={styles.fieldContainer} 
+            key={field.inputFormTaskFieldID}
+            onPress={() => handleInputChange(field.inputFormTaskFieldID, !taskResponses[field.inputFormTaskFieldID]?.value)}
+          >
+            <Text style={styles.checkMark}>
+              {taskResponses[field.inputFormTaskFieldID]?.value ? "✓" : "✓"}
+            </Text>
+            <Text style={styles.checkboxLabel}></Text>
+          </TouchableOpacity>
+        );
       case InputFormTaskInputType.Button:
         return (
           <View style={styles.buttonContainer} key={field.inputFormTaskFieldID}>
@@ -281,10 +297,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             </View>
           </View>
         );
-
-
-
-        case InputFormTaskInputType.CaptureImage:
+      case InputFormTaskInputType.CaptureImage:
         return (
           <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
             <TouchableOpacity
@@ -295,7 +308,6 @@ const TaskDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
         );
-
       default:
         return null;
     }
@@ -313,48 +325,53 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const isLastTask = currentTaskIndex === tasks.length - 1;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>{currentTask?.name}</Text>
-      </View>
-      <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
-        {currentTask?.fields.map((field) => renderField(field))}
-      </ScrollView>
-      {!keyboardVisible && (
-        <View style={styles.navigationContainer}>
-          <TouchableOpacity 
-            style={[styles.navButton, currentTaskIndex === 0 && styles.disabledNavButton]} 
-            onPress={handlePreviousTask}
-            disabled={currentTaskIndex === 0}
-          >
-            <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
-          </TouchableOpacity>
-          {isLastTask ? (
-            <TouchableOpacity 
-              style={styles.submitButton} 
-              onPress={handleSubmitAndGoBack}
-              disabled={submitting}
-            >
-              <Text style={styles.submitButtonText}>
-                {submitting ? 'Submitting...' : 'Submit All Responses'}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={styles.navButton}
-              onPress={handleNextTask}
-            >
-              <Text style={styles.navText}>{'>'}</Text>
-            </TouchableOpacity>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PanGestureHandler
+        onGestureEvent={handleGesture}
+        onHandlerStateChange={handleStateChange}
+      >
+        <Animated.View style={[styles.container, { transform: [{ translateY: pan.y }] }]}>
+          <View style={styles.header}>
+            <Text style={styles.headerText}>{currentTask?.name}</Text>
+          </View>
+          <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
+            {currentTask?.fields.map((field) => renderField(field))}
+          </ScrollView>
+          {!keyboardVisible && (
+            <View style={styles.navigationContainer}>
+              <TouchableOpacity 
+                style={[styles.navButton, currentTaskIndex === 0 && styles.disabledNavButton]} 
+                onPress={handlePreviousTask}
+                disabled={currentTaskIndex === 0}
+              >
+                <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
+              </TouchableOpacity>
+              {isLastTask ? (
+                <TouchableOpacity 
+                  style={styles.submitButton} 
+                  onPress={handleSubmitAndGoBack}
+                  disabled={submitting}
+                >
+                  <Text style={styles.submitButtonText}>
+                    {submitting ? 'Submitting...' : 'Submit All Responses'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.navButton}
+                  onPress={handleNextTask}
+                >
+                  <Text style={styles.navText}>{'>'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
-        </View>
-      )}
-      {!keyboardVisible && (
-        <TouchableOpacity style={styles.backButton}  onPress={handleBackPress}>
-          <Text style={styles.backText}>BACK</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+          <View style={styles.arrowContainer}>
+          <AntDesign name="arrowdown" size={24} color="#ffcc00" />
+          </View>
+        </Animated.View>
+      </PanGestureHandler>
+    </GestureHandlerRootView>
   );
 };
 
@@ -363,6 +380,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
+
+  arrowContainer: {
+    position: 'absolute',
+    top: 10,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  
   header: {
     justifyContent: "center",
     alignItems: "center",
@@ -370,6 +397,8 @@ const styles = StyleSheet.create({
     height: 120,
     backgroundColor: "#CAC3C3",
     marginBottom: 20,
+    marginTop: 50,
+   
   },
   headerText: {
     fontStyle: "normal",

@@ -1,7 +1,52 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList,ScrollView  } from 'react-native';
+import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image } from 'react-native';
 import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native';
+import { TbArrowBarDown } from "react-icons/tb";
+
+const AssignmentTypeIcon = ({ type }) => {
+  let iconSource;
+  switch (type) {
+    case 0: // Checklist
+      iconSource = require('./assets/checklist.jpg');
+      break;
+    case 1: // Instructions
+    iconSource = require('./assets/instructions.png');
+    break;
+  case 2: // Alert
+    iconSource = require('./assets/alert.png');
+    break;
+  case 3: // Ticket
+    iconSource = require('./assets/ticket.png');
+    break;
+  }
+  return <Image source={iconSource} style={styles.assignmentIcon} />;
+};
+
+const AssignmentItem = ({ item, onPress, isSelected, isCompleted }) => (
+  <TouchableOpacity
+    style={[
+      styles.assignmentItem, 
+      isCompleted && styles.completedAssignmentItem,
+      isSelected && styles.selectedAssignmentItem
+    ]}
+    onPress={onPress}
+    disabled={isCompleted}
+  >
+    <View style={styles.assignmentContent}>
+      <AssignmentTypeIcon type={item.assignmentType} />
+      <View style={styles.assignmentTextContainer}>
+        <Text style={[
+          styles.assignmentInstructions, 
+          isCompleted && styles.completedAssignmentInstructions
+        ]}>
+          {item.instructions || 'No instructions available'}
+        </Text>
+        <Text style={styles.assignmentName}>{item.name}</Text>
+      </View>
+    </View>
+  </TouchableOpacity>
+);
 
 const TaskScreen = ({ navigation, route }) => {
   const [assignments, setAssignments] = useState([]);
@@ -20,6 +65,8 @@ const TaskScreen = ({ navigation, route }) => {
         status: assignment.assignmentStatus,
         startDate: new Date(assignment.assignmentStartDate),
         endDate: new Date(assignment.assignmentEndDate),
+        assignmentType: assignment.assignmentType,
+        name: assignment.name,
       }));
       
       console.log('Processed assignments:', JSON.stringify(fetchedAssignments, null, 2));
@@ -54,44 +101,36 @@ const TaskScreen = ({ navigation, route }) => {
     }, [route.params?.completedAssignmentId])
   );
 
-  const handleAssignmentPress = (assignmentId) => {
-    if (assignments.find(assignment => assignment.id === assignmentId).status !== 3) {
-      setSelectedAssignmentId(assignmentId);
-    }
-  };
+  // const handleAssignmentPress = (assignmentId) => {
+  //   if (assignments.find(assignment => assignment.id === assignmentId).status !== 3) {
+  //     setSelectedAssignmentId(assignmentId);
+  //   }
+  // };
 
-  const handleStartPress = () => {
+  const handleStartPress = (assignmentId) => {
     if (selectedAssignmentId) {
       const selectedAssignment = assignments.find(assignment => assignment.id === selectedAssignmentId);
       navigation.navigate('Detail', { 
         assignmentId: selectedAssignmentId,
         instructions: selectedAssignment.instructions,
       });
+
+    }
+
+
+    if (assignments.find(assignment => assignment.id === assignmentId).status !== 3) {
+      setSelectedAssignmentId(assignmentId);
     }
   };
 
-  const renderAssignment = ({ item }) => {
-    console.log('Rendering assignment:', JSON.stringify(item, null, 2));
-    return (
-      <TouchableOpacity
-        style={[
-          styles.assignmentItem, 
-          item.status === 3 && styles.completedAssignmentItem,
-          item.id === selectedAssignmentId && styles.selectedAssignmentItem
-        ]}
-        onPress={() => handleAssignmentPress(item.id)}
-        disabled={item.status === 3}
-      >
-        <Text style={[
-          styles.assignmentInstructions, 
-          item.status === 3 && styles.completedAssignmentInstructions
-        ]}>
-          {item.instructions || 'No instructions available'}
-        </Text>
-
-      </TouchableOpacity>
-    );
-  };
+  const renderAssignment = ({ item }) => (
+    <AssignmentItem
+      item={item}
+      onPress={() => handleStartPress(item.id)}
+      isSelected={item.id === selectedAssignmentId}
+      isCompleted={item.status === 3}
+    />
+  );
 
   if (loading) {
     return (
@@ -101,7 +140,6 @@ const TaskScreen = ({ navigation, route }) => {
     );
   }
 
- 
   if (error) {
     console.error('Error rendering screen:', error);
     return (
@@ -128,7 +166,7 @@ const TaskScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <View style={styles.greetingBox}>
         <Text style={styles.greeting}>Hi Terry!</Text>
-        <Text style={styles.QueueTxt}>Today's job queue:</Text>
+        <Text style={styles.queueText}>Today's job queue:</Text>
       </View>
       <FlatList
         style={styles.assignmentsWrapper}
@@ -136,18 +174,7 @@ const TaskScreen = ({ navigation, route }) => {
         renderItem={renderAssignment}
         keyExtractor={item => item.id}
       />
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.buttonText}>BACK</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.startButton, !selectedAssignmentId && styles.disabledButton]} 
-          onPress={handleStartPress}
-          disabled={!selectedAssignmentId}
-        >
-          <Text style={styles.buttonText}>START</Text>
-        </TouchableOpacity>
-      </View>
+  
     </View>
   );
 };
@@ -179,7 +206,7 @@ const styles = StyleSheet.create({
   },
   assignmentItem: {
     backgroundColor: '#1c1c1c',
-    padding: 15,
+    padding: 10,
     borderRadius: 8,
     marginBottom: 10,
   },
@@ -192,18 +219,32 @@ const styles = StyleSheet.create({
     borderColor: '#ffcc00',
     borderWidth: 2,
   },
+  assignmentContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  assignmentTextContainer: {
+    flex: 1,
+  },
   assignmentInstructions: {
-    fontSize: 16,
+    marginTop: 15,
+    fontSize: 18,
     color: 'white',
-    marginBottom: 5,
+    marginLeft: 10,
   },
   completedAssignmentInstructions: {
     color: '#888',
     textDecorationLine: 'line-through',
   },
-  assignmentDates: {
-    fontSize: 12,
+  assignmentName: {
+    fontSize: 14,
     color: '#888',
+
+  },
+  assignmentIcon: {
+    width: 25,
+    height: 22,
+    marginRight: 10,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -240,11 +281,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   errorDetailsContainer: {
     backgroundColor: '#1c1c1c',
