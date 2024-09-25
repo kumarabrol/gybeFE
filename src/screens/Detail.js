@@ -11,16 +11,18 @@ const DetailScreen = ({ navigation, route }) => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState(true);
+
 
   const pan = useRef(new Animated.ValueXY()).current;
   const arrowOpacity = useRef(new Animated.Value(1)).current;
+  const [assignmentId, setAssignmentId] = useState(null);
 
   const fetchTasks = useCallback(async () => {
     try {
-      const response = await axios.get('https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/16');
-      
-      
+    const { assignmentId, instructions } = route.params
+    console.log('assignmentId...',assignmentId)
+      const response = await axios.get(`https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/${assignmentId}`);
       
       console.log('Raw API response:', JSON.stringify(response.data, null, 2));
       
@@ -30,6 +32,7 @@ const DetailScreen = ({ navigation, route }) => {
         status: 0, // Assuming 0 represents an uncompleted task
         fields: task.fields,
       }));
+       setAssignmentId(response.data.name);
       
       console.log('Processed tasks:', JSON.stringify(fetchedTasks, null, 2));
       setTasks(fetchedTasks);
@@ -48,7 +51,7 @@ const DetailScreen = ({ navigation, route }) => {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('Screen focused. Route params:', route.params);
+      console.log('Screen focused. Route params:......', route.params);
       if (route.params?.completedTaskId) {
         console.log('Completed task ID received:', route.params.completedTaskId);
         setTasks(prevTasks => 
@@ -70,9 +73,22 @@ const DetailScreen = ({ navigation, route }) => {
   };
 
   const handleStartPress = (taskId) => {
+    const selectedTask = tasks.find(task => task.id === taskId);
+    const { assignmentId } = route.params
+    console.log('assignmentId in details...',route.params)
+    if (selectedTask && selectedTask.status !== 3) {
+      setSelectedTaskId(taskId);
+      navigation.navigate('Task-Details', {
+        assignmentId: assignmentId,
+      });
+    }
+  };
+
+ /* const handleStartPress = (taskId) => {
     if (selectedTaskId) {
+       //const selectedTask = tasks.find(task => task.id === taskId);
       const selectedTask = tasks.find(task => task.id === selectedTaskId);
-      navigation.navigate('TaskDetail', { 
+      navigation.navigate('Task-Details', {
         taskId: selectedTaskId,
         fields: selectedTask.fields,
       });
@@ -81,7 +97,7 @@ const DetailScreen = ({ navigation, route }) => {
     if (tasks.find(task => task.id === taskId).status !== 3) {
       setSelectedTaskId(taskId);
     }
-  };
+  };*/
 
   const handleGesture = Animated.event(
     [{ nativeEvent: { translationY: pan.y } }],
@@ -130,7 +146,7 @@ const DetailScreen = ({ navigation, route }) => {
 
   const renderTask = ({ item }) => {
     const hasResponse = item.fields.some(field => field.response.trim() !== "");
-
+    console.info('item at line 148..', item.id)
     return (
       <TouchableOpacity
         style={[
@@ -141,7 +157,7 @@ const DetailScreen = ({ navigation, route }) => {
           item.id === selectedTaskId && styles.selectedTaskItem // Highlight selected task
         ]}
         onPress={() => handleStartPress(item.id)}
-        disabled={hasResponse || item.status === 3} // Disable if the task has response or is completed
+        //disabled={hasResponse || item.status === 3} // Disable if the task has response or is completed
       >
         <Text style={[
           styles.taskName,
@@ -183,8 +199,8 @@ const DetailScreen = ({ navigation, route }) => {
           <Icon name="arrow-down" size={24} color="#ffcc00" />
         </View>
         <View style={styles.greetingBox}>
-          <Text style={styles.greeting}>Hi Terry!</Text>
-          <Text style={styles.queueText}>Today's task queue:</Text>
+          <Text style={styles.greeting}>{assignmentId ? `${assignmentId}` : 'there'}!</Text>
+          <Text style={styles.queueText}>Please complete following tasks :</Text>
         </View>
         <FlatList
           style={styles.tasksWrapper}

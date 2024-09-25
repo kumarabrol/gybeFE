@@ -12,10 +12,10 @@ function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Home">
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Task" component={TaskScreen} />
-        <Stack.Screen name="Detail" component={DetailScreen} />
-        <Stack.Screen name="TaskDetail" component={TaskDatailScreen} />
+        <Stack.Screen name="Gybe" component={HomeScreen} />
+        <Stack.Screen name="Assignments" component={TaskScreen} />
+        <Stack.Screen name="Task" component={DetailScreen} />
+        <Stack.Screen name="Task-Details" component={TaskDatailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

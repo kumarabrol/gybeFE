@@ -2,7 +2,7 @@
   "expo": {
     "name": "rn-starter",
     "slug": "rn-starter",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.devgybecloud.rnstarter"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,8 +28,15 @@
       "azureAd": {
         "tenantId": "444f5a79-d01d-4ae0-956f-de57f3e55942",
         "clientId": "b921eea8-7b3d-4ef4-85f1-40a2934c17bf",
-        "redirectUrl": "gybe://auth/", 
-        "scopes": ["openid", "profile", "email"]
+        "redirectUrl": "gybe://auth/",
+        "scopes": [
+          "openid",
+          "profile",
+          "email"
+        ]
+      },
+      "eas": {
+        "projectId": "84c23d97-8962-4115-81ec-c3ddd39a6bb6"
       }
     }
   }

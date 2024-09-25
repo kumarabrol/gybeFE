@@ -51,13 +51,18 @@ const TaskDetailScreen = ({ navigation, route }) => {
     React.useCallback(() => {
       const fetchTasks = async () => {
         try {
-          const response = await axios.get(`https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/16`);
+
+         const { assignmentId } = route.params
+         console.log('assignmentId...',route.params)
+         const response = await axios.get(`https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/${assignmentId}`);
+
+          //const response = await axios.get(`https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/16`);
           setTasks(response.data.tasks);
           
           const initialResponses = response.data.tasks.reduce((acc, task) => {
             task.fields.forEach(field => {
               acc[field.inputFormTaskFieldID] = { 
-                value: field.inputFormTaskInputType === InputFormTaskInputType.CheckBox ? false : '', 
+                value: field.response,
                 status: false 
               };
             });
@@ -159,8 +164,11 @@ const TaskDetailScreen = ({ navigation, route }) => {
         }))
       }));
 
+      const { assignmentId, instructions } = route.params
+      console.log('assignmentId...168...',assignmentId)
+
       const payload = {
-        assignmentId: 16,
+        assignmentId: assignmentId,
         deviceId: 1,
         tasks: formattedTasks
       };
@@ -221,9 +229,9 @@ const TaskDetailScreen = ({ navigation, route }) => {
         );
       case InputFormTaskInputType.TextBox:
         return (
-          <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
+          <View style={[styles.fieldContainer, { justifyContent: 'center', alignItems: 'center' }]} key={field.inputFormTaskFieldID}>
             <TextInput
-              style={[styles.textInput, { width: width * 0.6 , height: 60 }] }
+              style={[styles.textInput, { width: width * 0.8 , height: 50 }] }
               placeholder={field.detail}
               value={taskResponses[field.inputFormTaskFieldID]?.value}
               onChangeText={(text) => handleInputChange(field.inputFormTaskFieldID, text)}
@@ -235,7 +243,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
       case InputFormTaskInputType.DropDown:
         const options = field.detail.split(';').map(option => option.trim());
         return (
-          <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
+          <View style={[styles.fieldContainer, { justifyContent: 'center', alignItems: 'center' }]} key={field.inputFormTaskFieldID}>
             <Picker
               selectedValue={taskResponses[field.inputFormTaskFieldID]?.value}
               style={[styles.dropfieldContainer, { width: width * 0.8 }]}
@@ -299,12 +307,12 @@ const TaskDetailScreen = ({ navigation, route }) => {
         );
       case InputFormTaskInputType.CaptureImage:
         return (
-          <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
+          <View style={{ width: 400, alignItems: 'center'}} key={field.inputFormTaskFieldID}>
             <TouchableOpacity
               style={styles.cameraButton}
               onPress={() => handleCaptureImage(field.inputFormTaskFieldID)}
             >
-              <MaterialIcons name="camera-alt" size={40} color="#fff" />
+              <MaterialIcons name="camera-alt" size={30}  color="#fff" />
             </TouchableOpacity>
           </View>
         );
@@ -419,7 +427,7 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   fieldContainer: {
-    alignItems: 'center',
+    alignItems: 'left',
     marginBottom: 20,
   },
   dropfieldContainer: {
@@ -450,7 +458,7 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: '#ffcc00',
-    padding: 15,
+    padding: 10,
     borderRadius: 5,
     marginVertical: 5,
     alignItems: 'center',
@@ -516,8 +524,8 @@ const styles = StyleSheet.create({
   },
   labelText: {
     color: '#fff',
-    fontSize: 40,
-    textAlign: 'center',
+    fontSize: 20,
+    textAlign: 'left',
   },
   submitButton: {
     backgroundColor: "#ffcc00",
@@ -541,8 +549,8 @@ const styles = StyleSheet.create({
 
   cameraButton: {
     backgroundColor: '#ffcc00',
-    padding: 20,
-    borderRadius: 50,
+    padding: 5,
+    borderRadius: 500,
     alignItems: 'center',
     justifyContent: 'center',
   },

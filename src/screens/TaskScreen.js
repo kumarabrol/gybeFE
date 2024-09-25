@@ -56,7 +56,7 @@ const TaskScreen = ({ navigation, route }) => {
   
   const fetchAssignments = useCallback(async () => {
     try {
-      const response = await axios.get('https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/Assignments/1');
+      const response = await axios.get('https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1');
       console.log('Raw API response:', JSON.stringify(response.data, null, 2));
       
       const fetchedAssignments = response.data.map(assignment => ({
@@ -108,9 +108,21 @@ const TaskScreen = ({ navigation, route }) => {
   // };
 
   const handleStartPress = (assignmentId) => {
+    const selectedAssignment = assignments.find(assignment => assignment.id === assignmentId);
+
+    if (selectedAssignment) {
+      setSelectedAssignmentId(assignmentId);
+      navigation.navigate('Task', {
+        assignmentId: assignmentId,
+        instructions: selectedAssignment.instructions,
+      });
+    }
+  };
+
+  /*const handleStartPress = (assignmentId) => {
     if (selectedAssignmentId) {
       const selectedAssignment = assignments.find(assignment => assignment.id === selectedAssignmentId);
-      navigation.navigate('Detail', { 
+      navigation.navigate('Task', {
         assignmentId: selectedAssignmentId,
         instructions: selectedAssignment.instructions,
       });
@@ -121,7 +133,7 @@ const TaskScreen = ({ navigation, route }) => {
     if (assignments.find(assignment => assignment.id === assignmentId).status !== 3) {
       setSelectedAssignmentId(assignmentId);
     }
-  };
+  };*/
 
   const renderAssignment = ({ item }) => (
     <AssignmentItem
@@ -166,7 +178,7 @@ const TaskScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <View style={styles.greetingBox}>
         <Text style={styles.greeting}>Hi Terry!</Text>
-        <Text style={styles.queueText}>Today's job queue:</Text>
+        <Text style={styles.queueText}>Pending Assignments are:</Text>
       </View>
       <FlatList
         style={styles.assignmentsWrapper}

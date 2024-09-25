@@ -1,6 +1,6 @@
 {
   "name": "rn-starter",
-  "version": "1.0.0",
+  "version": "Beta.0.0.3",
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
