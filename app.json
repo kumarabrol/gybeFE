@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "rnstarter",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -26,9 +27,9 @@
     },
     "extra": {
       "azureAd": {
-        "tenantId": "444f5a79-d01d-4ae0-956f-de57f3e55942",
-        "clientId": "b921eea8-7b3d-4ef4-85f1-40a2934c17bf",
-        "redirectUrl": "gybe://auth/",
+        "tenantId": "e0c2104c-6ebd-43cf-91df-f960f271c9c8",
+        "clientId": "edb617eb-dce8-454a-a120-390b9da0096f",
+        "redirectUrl": "rnstarter://com.devgybecloud.rnstarter/auth",
         "scopes": [
           "openid",
           "profile",

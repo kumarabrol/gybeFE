@@ -2,12 +2,55 @@ import React, { useState } from 'react';
 import { Button, View, StyleSheet ,TextInput, Text } from 'react-native';
 // import { AuthManager } from './authManager'; // Adjust the path as necessary
 import packageJson from '../../package.json';
+/* Auth ref - https://docs.expo.dev/guides/authentication/#azure */
+import * as WebBrowser from 'expo-web-browser';
+import {
+  exchangeCodeAsync,
+  makeRedirectUri,
+  useAuthRequest,
+  useAutoDiscovery,
+} from 'expo-auth-session';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const HomeScreen = ({ navigation }) => {
 
+/* Auth */
+// Endpoint
+const b2cname = 'gybeb2cdev';
+const policyName = 'B2C_1_signupsignin1';
+const scheme = 'rnstarter';//'msauth';
+
+const discovery = useAutoDiscovery(
+  'https://' + b2cname + '.b2clogin.com/' + b2cname + '.onmicrosoft.com/' + policyName + '/v2.0'
+);
+
+const redirectUri = makeRedirectUri({
+  scheme: scheme,
+  path: 'com.devgybecloud.rnstarter/auth',
+});
+console.log('Redirect URI:', redirectUri);
+const clientId = 'edb617eb-dce8-454a-a120-390b9da0096f';
+
+// We store the JWT in here
+const [token, setToken] = useState(null);
+
+// Request
+const [request, , promptAsync] = useAuthRequest(
+  {
+    clientId,
+    scopes: ['openid', 'offline_access'],
+    //scopes: [`openid offline_access https://${b2cname}.onmicrosoft.com/api/resources`],
+    //scopes: ['openid', 'offline_access', 'resources'],
+    redirectUri,
+  },
+  discovery,
+);
+/* Auth */
+
 const [username, setUsername] = useState('');
 const [password, setPassword] = useState('');
-const handleSignIn = async () => {
+const handleSignIn_old = async () => {
 
     try {
     console.log('Username:', username);
@@ -18,6 +61,34 @@ const handleSignIn = async () => {
     } catch (error) {
       console.error('Sign-in failed:', error);
     }
+  };
+
+const handleSignIn = async () => {
+    console.log('Sign-in button pressed');
+    promptAsync().then((codeResponse) => {
+      if (request && codeResponse?.type === 'success' && discovery) {
+        console.log('Authorization code: ', codeResponse.params.code);
+
+        exchangeCodeAsync(
+          {
+            clientId,
+            code: codeResponse.params.code,
+            extraParams: request.codeVerifier
+              ? { code_verifier: request.codeVerifier }
+              : undefined,
+            redirectUri,
+          },
+          discovery,
+        ).then((res) => {
+          console.log('Access token: ', res.accessToken);
+          setToken(res.accessToken);
+        }).catch((error) => {
+          console.error('Failed to exchange code:', error);
+        });
+      }
+    }).catch((error) => {
+      console.error('Failed to prompt:', error);
+    });
   };
 
   return (
@@ -36,9 +107,10 @@ const handleSignIn = async () => {
             onChangeText={setPassword}
             secureTextEntry={true} // For password input
           />
-      <Button title="Sign In" onPress={handleSignIn} />
+      <Button title="Sign In" onPress={handleSignIn} disabled={!request} />
       <Text style={styles.versionText}>App Version: {packageJson.version}</Text>
 
+      <Text>{token}</Text>
     </View>
   );
 };
