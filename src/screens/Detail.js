@@ -1,51 +1,41 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList, Animated } from 'react-native';
-import axios from 'axios';
+import { Text, StyleSheet, View, TouchableOpacity, FlatList, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import { AntDesign } from '@expo/vector-icons'; // Make sure to install expo-vector-icons
-import { TbArrowBarDown } from 'react-icons/tb';
-import Icon from 'react-native-vector-icons/Ionicons'; // Use 'Ionicons' or another icon set
-
-
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const DRAG_THRESHOLD = 50;
 
 const DetailScreen = ({ navigation, route }) => {
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [deviceId, setDeviceId] = useState(0);
   const [error, setError] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
-  
+  const [assignmentName, setAssignmentName] = useState('');
+
   const pan = useRef(new Animated.ValueXY()).current;
   const arrowOpacity = useRef(new Animated.Value(1)).current;
 
-  const fetchTasks = useCallback(async () => {
-    try {
-      const response = await axios.get('https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/16');
-      console.log('Raw API response:', JSON.stringify(response.data, null, 2));
+  useEffect(() => {
+    const { detailedData } = route.params;
+    if (detailedData) {
+      console.log('Detailed data from route params:', JSON.stringify(detailedData, null, 2));
+      setAssignmentName(detailedData.name);
+      setDeviceId(detailedData.deviceId);
       
-      const fetchedTasks = response.data.tasks.map(task => ({
+      const processedTasks = detailedData.tasks.map(task => ({
         id: task.inputFormTaskID.toString(),
         name: task.name,
         status: 0, // Assuming 0 represents an uncompleted task
         fields: task.fields,
       }));
       
-      console.log('Processed tasks:', JSON.stringify(fetchedTasks, null, 2));
-      setTasks(fetchedTasks);
-      setError(null);
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-      setError('Failed to fetch tasks. Please try again later.');
-    } finally {
-      setLoading(false);
+      console.log('Processed tasks:', JSON.stringify(processedTasks, null, 2));
+      setTasks(processedTasks);
+    } else {
+      setError('No detailed data provided');
     }
-  }, []);
-
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+  }, [route.params]);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,24 +54,23 @@ const DetailScreen = ({ navigation, route }) => {
     }, [route.params?.completedTaskId])
   );
 
-  const handleTaskPress = (taskId) => {
-    if (tasks.find(task => task.id === taskId).status !== 3) {
-      setSelectedTaskId(taskId);
-    }
-  };
-
   const handleStartPress = (taskId) => {
-    if (selectedTaskId) {
-      const selectedTask = tasks.find(task => task.id === selectedTaskId);
-      navigation.navigate('TaskDetail', { 
-        taskId: selectedTaskId,
-        fields: selectedTask.fields,
-      });
-    }
-
-
-    if (tasks.find(task => task.id === taskId).status !== 3) {
+    const selectedTask = tasks.find(task => task.id === taskId);
+    const { assignmentId, instructions, type } = route.params;
+    console.log(type);
+    console.log(deviceId);
+    console.log('assignmentId in details...', assignmentId);
+    const { detailedData } = route.params;
+    if (selectedTask && selectedTask.status !== 3) {
       setSelectedTaskId(taskId);
+      navigation.navigate('Task-Details', {
+        assignmentId: assignmentId,
+        instructions: instructions,
+        type: type,
+        deviceId: deviceId,
+        taskData: selectedTask,
+        detailedData: detailedData
+      });
     }
   };
 
@@ -131,19 +120,22 @@ const DetailScreen = ({ navigation, route }) => {
   }, [arrowOpacity]);
 
   const renderTask = ({ item }) => {
-    console.log('Rendering task:', JSON.stringify(item, null, 2));
+    const hasResponse = item.fields.some(field => field.response.trim() !== "");
     return (
       <TouchableOpacity
         style={[
-          styles.taskItem, 
+          styles.taskItem,
+          hasResponse && styles.taskWithResponse,
+          !hasResponse && styles.taskWithoutResponse,
           item.status === 3 && styles.completedTaskItem,
-          item.id === selectedTaskId && styles.selectedTaskItem
+          item.id === selectedTaskId 
         ]}
         onPress={() => handleStartPress(item.id)}
-        disabled={item.status === 3}
       >
         <Text style={[
-          styles.taskName, 
+          styles.taskName,
+          hasResponse && styles.taskWithResponseText,
+          !hasResponse && styles.taskWithoutResponseText,
           item.status === 3 && styles.completedTaskName
         ]}>
           {item.name}
@@ -153,14 +145,6 @@ const DetailScreen = ({ navigation, route }) => {
   };
 
   const renderContent = () => {
-    if (loading) {
-      return (
-        <View style={styles.container}>
-          <ActivityIndicator size="large" color="#ffcc00" />
-        </View>
-      );
-    }
-
     if (error) {
       return (
         <View style={styles.container}>
@@ -180,8 +164,8 @@ const DetailScreen = ({ navigation, route }) => {
        <Icon  name="arrow-down" size={24} color="#ffcc00" />
       </View>
         <View style={styles.greetingBox}>
-          <Text style={styles.greeting}>Hi Terry!</Text>
-          <Text style={styles.queueText}>Today's task queue:</Text>
+          <Text style={styles.greeting}>{assignmentName || 'Assignment'}</Text>
+          <Text style={styles.queueText}>Please complete following tasks:</Text>
         </View>
         <FlatList
           style={styles.tasksWrapper}
@@ -250,11 +234,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     opacity: 0.7,
   },
-  selectedTaskItem: {
-    backgroundColor: '#333',
-    borderColor: '#ffcc00',
-    borderWidth: 2,
-  },
+ 
   taskName: {
     fontSize: 16,
     color: 'white',

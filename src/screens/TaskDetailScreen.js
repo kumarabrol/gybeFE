@@ -6,6 +6,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { AntDesign } from '@expo/vector-icons'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import * as ImagePicker from 'expo-image-picker'; // Add this import
+import * as FileSystem from 'expo-file-system';
+
 
 const InputFormTaskInputType = {
   Label: 0,
@@ -27,8 +32,13 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const { assignmentId } = route.params;
+  const { assignmentId , instructions, detailedData } = route.params;
+  const [isConnected, setIsConnected] = useState(true);
+  const [isReallyConnected, setIsReallyConnected] = useState(true);
+  
 
+
+  
   const pan = useRef(new Animated.ValueXY()).current;
 
   useEffect(() => {
@@ -49,41 +59,39 @@ const TaskDetailScreen = ({ navigation, route }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      const fetchTasks = async () => {
-        try {
-          const response = await axios.get(`https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/16`);
-          setTasks(response.data.tasks);
-          
-          const initialResponses = response.data.tasks.reduce((acc, task) => {
-            task.fields.forEach(field => {
-              acc[field.inputFormTaskFieldID] = { 
-                value: field.inputFormTaskInputType === InputFormTaskInputType.CheckBox ? false : '', 
-                status: false 
-              };
-            });
-            return acc;
-          }, {});
-          setTaskResponses(initialResponses);
-        } catch (error) {
-          console.error('Error fetching tasks:', error);
-          Alert.alert('Error', 'Failed to fetch tasks. Please try again.');
-        } finally {
-          setLoading(false);
-        }
-      };
+      if (detailedData && detailedData.tasks) {
+        setTasks(detailedData.tasks);
+        
+        const initialResponses = detailedData.tasks.reduce((acc, task) => {
+          task.fields.forEach(field => {
+            acc[field.inputFormTaskFieldID] = { 
+              value: field.response,
+              status: false 
+            };
+          });
+          return acc;
+        }, {});
 
-      fetchTasks();
-      return () => {
-        // Clean up function if needed
-      };
-    }, [assignmentId])
+        console.log('Initial field responses:', initialResponses);
+        setTaskResponses(initialResponses);
+        setLoading(false);
+      } else {
+        console.error('No detailed data provided in route params');
+        Alert.alert('Error', 'Failed to load task data. Please go back and try again.');
+        setLoading(false);
+      }
+    }, [detailedData])
   );
+
 
   const handleGesture = Animated.event(
     [{ nativeEvent: { translationY: pan.y } }],
     { useNativeDriver: false }
   );
-
+  
+  const toggleConnection = () => {
+    setIsConnected(!isConnected);
+  };
   const handleStateChange = ({ nativeEvent }) => {
     if (nativeEvent.oldState === State.ACTIVE) {
       if (nativeEvent.translationY > DRAG_THRESHOLD) {
@@ -125,11 +133,43 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }));
   };
 
-  const handleCaptureImage = (fieldId) => {
+  const handleCaptureImage = async (fieldId) => {
     console.log('Capture image for field:', fieldId);
-    Alert.alert('Image Capture', 'Image capture functionality to be implemented.');
-  };
+    
+    // Request camera permissions
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Sorry, we need camera permissions to make this work!');
+      return;
+    }
 
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        console.log('Image captured');
+        
+        let base64Image = asset.base64;
+        if (!base64Image) {
+          const fileUri = asset.uri;
+          base64Image = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.Base64 });
+        }
+
+        const base64ImageWithPrefix = `data:image/jpeg;base64,${base64Image}`;
+        handleInputChange(fieldId, base64ImageWithPrefix);
+      }
+    } catch (error) {
+      console.error('Error capturing image:', error);
+      Alert.alert('Error', 'Failed to capture image. Please try again.');
+    }
+  };
   const handleNextTask = () => {
     if (currentTaskIndex < tasks.length - 1) {
       setCurrentTaskIndex(prevIndex => prevIndex + 1);
@@ -141,6 +181,120 @@ const TaskDetailScreen = ({ navigation, route }) => {
       setCurrentTaskIndex(prevIndex => prevIndex - 1);
     }
   };
+
+  const saveResponsesLocally = async (response) => {
+    try {
+      console.log('Attempting to save response locally:', JSON.stringify(response, null, 2));
+  
+      const existingResponsesString = await AsyncStorage.getItem('offlineResponses');
+      let offlineResponses = [];
+      if (existingResponsesString) {
+        try {
+          offlineResponses = JSON.parse(existingResponsesString);
+          if (!Array.isArray(offlineResponses)) {
+            console.warn('Existing responses is not an array, resetting to empty array');
+            offlineResponses = [];
+          }
+        } catch (parseError) {
+          console.error('Error parsing existing responses:', parseError);
+          offlineResponses = [];
+        }
+      }
+  
+      offlineResponses.push(response);
+  
+      const updatedResponsesString = JSON.stringify(offlineResponses);
+      await AsyncStorage.setItem('offlineResponses', updatedResponsesString);
+  
+      console.log('Response saved successfully. Updated storage:', updatedResponsesString);
+  
+      // Verify storage
+      const verificationString = await AsyncStorage.getItem('offlineResponses');
+      console.log('Verification of saved data:', verificationString);
+  
+    } catch (error) {
+      console.error('Error saving response locally:', error);
+    }
+  };
+
+
+  const syncOfflineResponses = async () => {
+    try {
+      console.log('Starting to sync offline responses');
+      const offlineResponsesString = await AsyncStorage.getItem('offlineResponses');
+      console.log(offlineResponsesString)
+      if (!offlineResponsesString) {
+        console.log('No offline responses found to sync');
+        return { successful: [], failed: [] };
+      }
+  
+      let responses;
+      try {
+        responses = JSON.parse(offlineResponsesString);
+        console.log('Parsed offline responses:', JSON.stringify(responses, null, 2));
+      } catch (parseError) {
+        console.error('Error parsing offline responses:', parseError);
+        await AsyncStorage.removeItem('offlineResponses');
+        return { successful: [], failed: [] };
+      }
+  
+      if (!Array.isArray(responses) || responses.length === 0) {
+        console.log('No valid offline responses to sync');
+        await AsyncStorage.removeItem('offlineResponses');
+        return { successful: [], failed: [] };
+      }
+  
+      const successfulSubmissions = [];
+      const failedSubmissions = [];
+  
+      for (const response of responses) {
+        try {
+          console.log('Submitting offline response:', JSON.stringify(response, null, 2));
+          await submitResponse(response);
+          successfulSubmissions.push(response);
+          console.log('Successfully submitted offline response');
+        } catch (submissionError) {
+          console.error('Error submitting offline response:', submissionError);
+          // failedSubmissions.push({ response, error: submissionError.message });
+        }
+      }
+  
+      if (failedSubmissions.length > 0) {
+        console.log('Some submissions failed. Retaining failed submissions in storage.');
+        await AsyncStorage.setItem('offlineResponses', JSON.stringify(failedSubmissions.map(f => f.response)));
+      } else {
+        console.log('All offline responses synced successfully. Clearing storage.');
+        await AsyncStorage.removeItem('offlineResponses');
+      }
+  
+      console.log(`Sync complete. Successful: ${successfulSubmissions.length}, Failed: ${failedSubmissions.length}`);
+  
+      return { successful: successfulSubmissions, failed: failedSubmissions };
+    } catch (error) {
+      console.error('Error in syncOfflineResponses:', error);
+      throw error;
+    }
+  };
+  const submitResponse = async (payload) => {
+    try {
+      const response = await axios.put(
+        'http://gybeapis-v43.westus.azurecontainer.io/api/Assignment/RecordAssignmentWork',
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'accept': '*/*'
+          }
+        }
+      );
+      console.log('Submit response:', response.data);
+    } catch (error) {
+      console.error('Error submitting response:', error);
+      throw error;
+    }
+  };
+
+
 
   const handleSubmitAndGoBack = async () => {
     setSubmitting(true);
@@ -158,58 +312,39 @@ const TaskDetailScreen = ({ navigation, route }) => {
           inputFormCellLocation: field.inputFormCellLocation || ''
         }))
       }));
-
+      
+      const { type, deviceId } = route.params;
+      
       const payload = {
-        assignmentId: 16,
-        deviceId: 1,
+        assignmentId: parseInt(assignmentId, 10),
+        deviceId: deviceId,
+        assignmentType: type,
+        name: instructions,
         tasks: formattedTasks
       };
-
       console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
-      const response = await axios.put(
-        'https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/RecordAssignmentWork',
-        payload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'accept': '*/*'
-          }
-        }
-      );
-
-      console.log('Submit response:', response.data);
-      Alert.alert('Success', 'Responses submitted successfully!', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-    } catch (error) {
-      console.error('Error submitting responses:', error);
-      
-      let errorMessage = 'Failed to submit responses. Please try again.';
-      if (error.response) {
-        console.error('Error data:', error.response.data);
-        console.error('Error status:', error.response.status);
-        console.error('Error headers:', error.response.headers);
-        
-        if (error.response.status === 500) {
-          errorMessage = 'The server encountered an internal error. Please try again later or contact support.';
-          console.error('Server error details:', error.response.data);
-        } else {
-          errorMessage = `Server error (${error.response.status}): ${JSON.stringify(error.response.data)}`;
-        }
-      } else if (error.request) {
-        console.error('Error request:', error.request);
-        errorMessage = 'No response received from server. Please check your internet connection.';
+      if (isConnected) {
+        const response = await submitResponse(payload);
+        console.log('Current response submitted successfully:', response);
+        await syncOfflineResponses();
+        Alert.alert('Success', 'Responses submitted successfully!', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
       } else {
-        console.error('Error message:', error.message);
-        errorMessage = `Error: ${error.message}`;
+        await saveResponsesLocally(payload);
+        Alert.alert('Offline Mode', 'Responses saved locally. They will be submitted when internet connection is restored.', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
       }
-      
-      Alert.alert('Error', errorMessage);
+    } catch (error) {
+      console.error('Error in handleSubmitAndGoBack:', error);
+      Alert.alert('Error', 'Failed to handle submission. Please check the console for more details and try again.');
     } finally {
       setSubmitting(false);
     }
   };
+
 
   const renderField = (field) => {
     switch (field.inputFormTaskInputType) {
@@ -297,17 +432,25 @@ const TaskDetailScreen = ({ navigation, route }) => {
             </View>
           </View>
         );
-      case InputFormTaskInputType.CaptureImage:
-        return (
-          <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
-            <TouchableOpacity
-              style={styles.cameraButton}
-              onPress={() => handleCaptureImage(field.inputFormTaskFieldID)}
-            >
-              <MaterialIcons name="camera-alt" size={40} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        );
+        case InputFormTaskInputType.CaptureImage:
+          return (
+            <View style={{ width: 400, alignItems: 'center'}} key={field.inputFormTaskFieldID}>
+              <TouchableOpacity
+                style={styles.cameraButton}
+                onPress={() => handleCaptureImage(field.inputFormTaskFieldID)}
+              >
+                <MaterialIcons name="camera-alt" size={30}  color="#fff" />
+              </TouchableOpacity>
+              {taskResponses[field.inputFormTaskFieldID]?.value && (
+                <View>
+                  <Text style={styles.imageCapturedText}>Image captured</Text>
+                  <View style={styles.imagePlaceholder}>
+                    <Text style={styles.imagePlaceholderText}>Image Preview</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          );
       default:
         return null;
     }
@@ -331,6 +474,23 @@ const TaskDetailScreen = ({ navigation, route }) => {
         onHandlerStateChange={handleStateChange}
       >
         <Animated.View style={[styles.container, { transform: [{ translateY: pan.y }] }]}>
+          
+      <View style={styles.networkToggle}>
+       
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
+          ]}
+          onPress={toggleConnection}
+        >
+          <Text style={styles.toggleButtonText}>
+            {isConnected ? 'Go Offline' : 'Go Online'}
+          </Text>
+        </TouchableOpacity>
+      </View> 
+          
+          
           <View style={styles.header}>
             <Text style={styles.headerText}>{currentTask?.name}</Text>
           </View>
@@ -338,33 +498,36 @@ const TaskDetailScreen = ({ navigation, route }) => {
             {currentTask?.fields.map((field) => renderField(field))}
           </ScrollView>
           {!keyboardVisible && (
-            <View style={styles.navigationContainer}>
-              <TouchableOpacity 
-                style={[styles.navButton, currentTaskIndex === 0 && styles.disabledNavButton]} 
-                onPress={handlePreviousTask}
-                disabled={currentTaskIndex === 0}
-              >
-                <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
-              </TouchableOpacity>
-              {isLastTask ? (
-                <TouchableOpacity 
-                  style={styles.submitButton} 
-                  onPress={handleSubmitAndGoBack}
-                  disabled={submitting}
-                >
-                  <Text style={styles.submitButtonText}>
-                    {submitting ? 'Submitting...' : 'Submit All Responses'}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  style={styles.navButton}
-                  onPress={handleNextTask}
-                >
-                  <Text style={styles.navText}>{'>'}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+           <View style={styles.navigationContainer}>
+           <TouchableOpacity 
+             style={[styles.navButton, currentTaskIndex === 0 && styles.disabledNavButton]} 
+             onPress={handlePreviousTask}
+             disabled={currentTaskIndex === 0}
+           >
+             <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
+           </TouchableOpacity>
+         
+           <TouchableOpacity 
+             style={styles.submitButton} 
+             onPress={handleSubmitAndGoBack}
+             disabled={submitting}
+           >
+             <Text style={styles.submitButtonText}>
+               {submitting ? 'Submitting...' : 'Submit'}
+             </Text>
+           </TouchableOpacity>
+         
+           <TouchableOpacity 
+             style={[styles.navButton, isLastTask && styles.disabledNavButton]}
+             onPress={handleNextTask}
+             disabled={isLastTask}
+           >
+             <Text style={[styles.navText, isLastTask && styles.disabledNavText]}>{'>'}</Text>
+           </TouchableOpacity>
+   
+            
+
+         </View>
           )}
           <View style={styles.arrowContainer}>
           <AntDesign name="arrowdown" size={24} color="#ffcc00" />
@@ -442,6 +605,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 60,
     fontWeight: 'bold',
+    left: 170,
   },
   checkboxLabel: {
     color: '#fff',
@@ -479,19 +643,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
   },
+ 
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     marginBottom: 20,
   },
   navButton: {
     padding: 10,
+    width: 60,
+    alignItems: 'center',
   },
   navText: {
     color: "#fff",
-    fontSize: 50,
+    fontSize: 30,
   },
   disabledNavButton: {
     opacity: 0.5,
@@ -499,34 +666,14 @@ const styles = StyleSheet.create({
   disabledNavText: {
     color: "#888",
   },
-  backButton: {
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 5,
-  },
-  backText: {
-    color: "#fff",
-    fontSize: 20,
-  },
-  labelText: {
-    color: '#fff',
-    fontSize: 40,
-    textAlign: 'center',
-  },
   submitButton: {
     backgroundColor: "#ffcc00",
     justifyContent: "center",
     alignItems: "center",
-    padding: 15,
+    padding: 10,
     borderRadius: 5,
     flex: 1,
-    marginLeft: 10,
+    marginHorizontal: 10,
   },
   submitButtonText: {
     color: "#000",
@@ -546,6 +693,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  networkToggle: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+  },
+  networkToggleText: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#000',
+  },
+  toggleButton: {
+    padding: 10,
+    borderRadius: 5,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  toggleButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  fieldLabel: {
+    color: '#fff',
+    fontSize: 18,
+    marginBottom: 10,
+  },
+  labelText: {
+    color: '#fff',
+    fontSize: 20,
+    textAlign: 'left',
+  },
+  imageCapturedText: {
+    color: '#fff',
+    marginTop: 10,
+    fontSize: 16,
+  },
+
+  cameraButton: {
+    backgroundColor: '#ffcc00',
+    padding: 15,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  imageCapturedText: {
+    color: '#fff',
+    marginTop: 10,
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  imagePlaceholder: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  imagePlaceholderText: {
+    color: '#666',
+    fontSize: 12,
+  },
+  
 
 });
 
