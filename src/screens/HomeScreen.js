@@ -19,7 +19,7 @@ const HomeScreen = ({ navigation }) => {
 // Endpoint
 const b2cname = 'gybeb2cdev';
 const policyName = 'B2C_1_signupsignin1';
-const scheme = 'rnstarter';//'msauth';
+const scheme = 'rnstarter';
 
 const discovery = useAutoDiscovery(
   'https://' + b2cname + '.b2clogin.com/' + b2cname + '.onmicrosoft.com/' + policyName + '/v2.0'
@@ -39,15 +39,14 @@ const [token, setToken] = useState(null);
 const [request, , promptAsync] = useAuthRequest(
   {
     clientId,
-    scopes: ['openid', 'offline_access'],
-    //scopes: [`openid offline_access https://${b2cname}.onmicrosoft.com/api/resources`],
-    //scopes: ['openid', 'offline_access', 'resources'],
+    scopes: ['openid', 'offline_access', `https://${b2cname}.onmicrosoft.com/api/resources`],
     redirectUri,
   },
   discovery,
 );
 /* Auth */
 
+/*
 const [username, setUsername] = useState('');
 const [password, setPassword] = useState('');
 const handleSignIn_old = async () => {
@@ -62,7 +61,7 @@ const handleSignIn_old = async () => {
       console.error('Sign-in failed:', error);
     }
   };
-
+*/
 const handleSignIn = async () => {
     console.log('Sign-in button pressed');
     promptAsync().then((codeResponse) => {
@@ -82,6 +81,7 @@ const handleSignIn = async () => {
         ).then((res) => {
           console.log('Access token: ', res.accessToken);
           setToken(res.accessToken);
+          navigation.navigate('Assignments'); // Navigate to the next screen
         }).catch((error) => {
           console.error('Failed to exchange code:', error);
         });
@@ -94,7 +94,7 @@ const handleSignIn = async () => {
   return (
     <View style={styles.container}>
         <Text style={styles.greeting}>Welcome to Gybe</Text>
-        <TextInput
+        {/* <TextInput
                 style={styles.input}
                 placeholder="Username"
                 value={username}
@@ -107,10 +107,9 @@ const handleSignIn = async () => {
             onChangeText={setPassword}
             secureTextEntry={true} // For password input
           />
+       */}
       <Button title="Sign In" onPress={handleSignIn} disabled={!request} />
       <Text style={styles.versionText}>App Version: {packageJson.version}</Text>
-
-      <Text>{token}</Text>
     </View>
   );
 };
