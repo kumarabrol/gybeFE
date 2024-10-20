@@ -3,6 +3,8 @@ import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator, FlatList, 
 import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native';
 import { TbArrowBarDown } from "react-icons/tb";
+import {AsyncStorage} from 'react-native';
+
 
 const AssignmentTypeIcon = ({ type }) => {
   let iconSource;
@@ -28,7 +30,7 @@ const AssignmentItem = ({ item, onPress, isSelected, isCompleted }) => (
     style={[
       styles.assignmentItem, 
       isCompleted && styles.completedAssignmentItem,
-      isSelected && styles.selectedAssignmentItem
+      isSelected 
     ]}
     onPress={onPress}
     disabled={isCompleted}
@@ -50,104 +52,122 @@ const AssignmentItem = ({ item, onPress, isSelected, isCompleted }) => (
 
 const TaskScreen = ({ navigation, route }) => {
   const [assignments, setAssignments] = useState([]);
+  const [detailedAssignments, setDetailedAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(null);
-  
-  const fetchAssignments = useCallback(async () => {
+  const [isOnline, setIsOnline] = useState(true);
+
+  const toggleConnection = () => setIsOnline(!isOnline);
+
+  const saveDataToStorage = async (key, data) => {
     try {
-      const response = await axios.get('https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1');
-      console.log('Raw API response:', JSON.stringify(response.data, null, 2));
-      
-      const fetchedAssignments = response.data.map(assignment => ({
-        id: assignment.assignmentId.toString(),
-        instructions: assignment.assignmentInstructions,
-        status: assignment.assignmentStatus,
-        startDate: new Date(assignment.assignmentStartDate),
-        endDate: new Date(assignment.assignmentEndDate),
-        assignmentType: assignment.assignmentType,
-        name: assignment.name,
-      }));
-      
-      console.log('Processed assignments:', JSON.stringify(fetchedAssignments, null, 2));
-      setAssignments(fetchedAssignments);
-      setError(null);
+      await AsyncStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      console.error('Error fetching assignments:', error.stack);
-      setError(error.stack);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // const CheckDeviceHealth = async () => {
-  //   const urlDeviceHealthCheck = 'https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/DeviceHealth';
-  //   var token = 'eyJhbGciOiJSUzI1NiIsImtpZCI6Ilg1ZVhrNHh5b2pORnVtMWtsMll0djhkbE5QNC1jNTdkTzZRR1RWQndhTmsiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiI4OGJlZDI3ZC04NzAyLTQ5ZTAtODM2YS0xYjg2MDYwMzBkOWYiLCJpc3MiOiJodHRwczovL2d5YmViMmNkZXYuYjJjbG9naW4uY29tL2UwYzIxMDRjLTZlYmQtNDNjZi05MWRmLWY5NjBmMjcxYzljOC92Mi4wLyIsImV4cCI6MTcyOTEzODQ5OSwibmJmIjoxNzI5MTM0ODk5LCJvaWQiOiI2NTJkZDNiNi00M2VjLTQxZWItODhhMy04OWE3ZjE0ODVlODYiLCJzdWIiOiI2NTJkZDNiNi00M2VjLTQxZWItODhhMy04OWE3ZjE0ODVlODYiLCJnaXZlbl9uYW1lIjoiVXNlciIsImZhbWlseV9uYW1lIjoiVHdvIiwiZW1haWxzIjpbInVzZXIyQGd5YmUuY28iXSwidGZwIjoiQjJDXzFfc2lnbnVwc2lnbmluMSIsInNjcCI6InJlc291cmNlcyIsImF6cCI6ImVkYjYxN2ViLWRjZTgtNDU0YS1hMTIwLTM5MGI5ZGEwMDk2ZiIsInZlciI6IjEuMCIsImlhdCI6MTcyOTEzNDg5OX0.DbW9oAxYvpRX4VICbm_xAzraFrdhLYRM5LTdqRRM-nGT3f55W0EedcBNNMuUGqrtESbx9AQCrOAhdVe1P_X8B0M_uqpblQpAsCfV1EpkFJ67NhRiDt58HYw4VnosbgS8uLJWx068qDwzzN2w5N_qR-XhhgoS0wp8pjMk9bOnDC44cLehTo2rNJjFQ7b52Nmhe2zNwWf4kclbbN3XH0u1OOPmGuswQgvn-3p8iSq-voxf6f7F7BqFOEIFtg7x1IFL8cdPmn5Kj7gxdWDFAyXu7wS2WiHQeKnP-rLgvh0QFB0bH9OiyhSSNj9Rex4mhnGpTViz4VIwg5oHedAxiOihtw';
-  //   var bearer = `Bearer ${token}`;
-  //   axios.get(urlDeviceHealthCheck, { headers: {'Authorization': bearer }}).then((response) => {
-  //     console.log('Device Health Check:', response.data);
-  //   }).catch((error) => {
-  //       console.error('Error checking device health:', error);
-  //   });
-  // };
-
-  useEffect(() => {
-    fetchAssignments();
-
-    console.log('Checking device health now...');
-    // CheckDeviceHealth();
-  }, [fetchAssignments]);
-
-  useFocusEffect(
-    useCallback(() => {
-      console.log('Screen focused. Route params:', route.params);
-      if (route.params?.completedAssignmentId) {
-        console.log('Completed assignment ID received:', route.params.completedAssignmentId);
-        setAssignments(prevAssignments => 
-          prevAssignments.map(assignment => 
-            assignment.id === route.params.completedAssignmentId.toString() 
-              ? { ...assignment, status: 3 } // Assuming 3 represents a completed assignment
-              : assignment
-          )
-        );
-        setSelectedAssignmentId(null);
-      }
-    }, [route.params?.completedAssignmentId])
-  );
-
-  // const handleAssignmentPress = (assignmentId) => {
-  //   if (assignments.find(assignment => assignment.id === assignmentId).status !== 3) {
-  //     setSelectedAssignmentId(assignmentId);
-  //   }
-  // };
-
-  const handleStartPress = (assignmentId) => {
-    const selectedAssignment = assignments.find(assignment => assignment.id === assignmentId);
-
-    if (selectedAssignment) {
-      setSelectedAssignmentId(assignmentId);
-      navigation.navigate('Task', {
-        assignmentId: assignmentId,
-        instructions: selectedAssignment.instructions,
-      });
+      console.error('Error saving data to storage:', error);
     }
   };
 
-  /*const handleStartPress = (assignmentId) => {
-    if (selectedAssignmentId) {
-      const selectedAssignment = assignments.find(assignment => assignment.id === selectedAssignmentId);
-      navigation.navigate('Task', {
-        assignmentId: selectedAssignmentId,
-        instructions: selectedAssignment.instructions,
-      });
+  const getDataFromStorage = async (key) => {
+    try {
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Error getting data from storage:', error);
+      return null;
+    }
+  };
 
+  const fetchDetailedAssignment = useCallback(async (assignmentId) => {
+    if (!isOnline) {
+      const storedData = await getDataFromStorage(`detailedAssignment_${assignmentId}`);
+      if (storedData) return storedData;
+      throw new Error('No stored data available for this assignment');
     }
 
+    try {
+      const response = await axios.get(`https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/${assignmentId}`);
+      // console.log(`Detailed assignment data for ID ${assignmentId}:`, JSON.stringify(response.data, null, 2));
+      await saveDataToStorage(`detailedAssignment_${assignmentId}`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching detailed assignment for ID ${assignmentId}:`, error.stack);
+      throw error;
+    }
+  }, [isOnline]);
 
-    if (assignments.find(assignment => assignment.id === assignmentId).status !== 3) {
+  const fetchAssignments = useCallback(async () => {
+    setLoading(true);
+    try {
+      let fetchedAssignments;
+      let fetchedDetailedAssignments;
+
+      if (isOnline) {
+        const response = await axios.get('https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1');
+        // console.log('Raw API response:', JSON.stringify(response.data, null, 2));
+        
+        fetchedAssignments = response.data.map(assignment => ({
+          id: assignment.assignmentId.toString(),
+          instructions: assignment.assignmentInstructions,
+          status: assignment.assignmentStatus,
+          startDate: new Date(assignment.assignmentStartDate),
+          endDate: new Date(assignment.assignmentEndDate),
+          assignmentType: assignment.assignmentType,
+          name: assignment.name,
+        }));
+        
+        await saveDataToStorage('assignments', fetchedAssignments);
+
+        // Fetch detailed data for each assignment
+        fetchedDetailedAssignments = await Promise.all(
+          fetchedAssignments.map(assignment => fetchDetailedAssignment(assignment.id))
+        );
+
+        // Save all detailed assignments data
+        await saveDataToStorage('detailedAssignments', fetchedDetailedAssignments);
+      } else {
+        fetchedAssignments = await getDataFromStorage('assignments');
+        fetchedDetailedAssignments = await getDataFromStorage('detailedAssignments');
+        if (!fetchedAssignments || !fetchedDetailedAssignments) {
+          throw new Error('No stored assignments or detailed data available');
+        }
+      }
+      
+      // console.log('Processed assignments:', JSON.stringify(fetchedAssignments, null, 2));
+      setAssignments(fetchedAssignments);
+      
+      // console.log('All detailed assignment data:', JSON.stringify(fetchedDetailedAssignments, null, 2));
+      setDetailedAssignments(fetchedDetailedAssignments);
+      
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching assignments:', error.stack);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchDetailedAssignment, isOnline]);
+
+  useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments, isOnline]);
+
+  const handleStartPress = useCallback((assignmentId) => {
+    const selectedAssignment = assignments.find(assignment => assignment.id === assignmentId);
+    const detailedData = detailedAssignments.find(detail => detail.assignmentId.toString() === assignmentId);
+    
+    if (selectedAssignment && detailedData) {
       setSelectedAssignmentId(assignmentId);
+      // console.log('Selected detailed assignment data:', JSON.stringify(detailedData, null, 2));
+      
+      navigation.navigate('Task', {
+        assignmentId: assignmentId,
+        instructions: selectedAssignment.instructions,
+        type: selectedAssignment.assignmentType,
+        detailedData: detailedData
+      });
     }
-  };*/
+  }, [assignments, detailedAssignments, navigation]);
 
   const renderAssignment = ({ item }) => (
     <AssignmentItem
@@ -157,6 +177,7 @@ const TaskScreen = ({ navigation, route }) => {
       isCompleted={item.status === 3}
     />
   );
+
 
   if (loading) {
     return (
@@ -170,17 +191,7 @@ const TaskScreen = ({ navigation, route }) => {
     console.error('Error rendering screen:', error);
     return (
       <ScrollView style={styles.container}>
-        <Text style={styles.errorText}>{error.message}</Text>
-        <View style={styles.errorDetailsContainer}>
-          <Text style={styles.errorDetailsTitle}>Error Details:</Text>
-          <Text style={styles.errorDetailsText}>{error}</Text>
-        </View>
-        {error.stack && (
-          <View style={styles.errorStackContainer}>
-            <Text style={styles.errorStackTitle}>Error Stack Trace:</Text>
-            <Text style={styles.errorStackText}>{error.stack}</Text>
-          </View>
-        )}
+        <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchAssignments}>
           <Text style={styles.buttonText}>Retry</Text>
         </TouchableOpacity>
@@ -190,9 +201,22 @@ const TaskScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.greetingBox}>
-        <Text style={styles.greeting}>Hi Terry!</Text>
-        <Text style={styles.queueText}>Pending Assignments are:</Text>
+      <View style={styles.headerContainer}>
+        <View style={styles.greetingBox}>
+          <Text style={styles.greeting}>Hi Terry!</Text>
+          <Text style={styles.queueText}>Pending Assignments are:</Text>
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            { backgroundColor: isOnline ? '#4CAF50' : '#F44336' }
+          ]}
+          onPress={toggleConnection}
+        >
+          <Text style={styles.toggleButtonText}>
+            {isOnline ? 'Go Offline' : 'Go Online'}
+          </Text>
+        </TouchableOpacity>
       </View>
       <FlatList
         style={styles.assignmentsWrapper}
@@ -200,10 +224,12 @@ const TaskScreen = ({ navigation, route }) => {
         renderItem={renderAssignment}
         keyExtractor={item => item.id}
       />
-  
     </View>
   );
 };
+
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -240,11 +266,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     opacity: 0.7,
   },
-  selectedAssignmentItem: {
-    backgroundColor: '#333',
-    borderColor: '#ffcc00',
-    borderWidth: 2,
-  },
+
   assignmentContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -348,6 +370,22 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 20,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  toggleButton: {
+    padding: 10,
+    borderRadius: 5,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  toggleButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 
