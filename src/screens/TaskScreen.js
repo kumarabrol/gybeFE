@@ -80,22 +80,22 @@ const TaskScreen = ({ navigation, route }) => {
     }
   }, []);
 
-  const CheckDeviceHealth = async () => {
-    const urlDeviceHealthCheck = 'https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/DeviceHealth';
-    var token = 'eyJhbGciOiJSUzI1NiIsImtpZCI6Ilg1ZVhrNHh5b2pORnVtMWtsMll0djhkbE5QNC1jNTdkTzZRR1RWQndhTmsiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiI4OGJlZDI3ZC04NzAyLTQ5ZTAtODM2YS0xYjg2MDYwMzBkOWYiLCJpc3MiOiJodHRwczovL2d5YmViMmNkZXYuYjJjbG9naW4uY29tL2UwYzIxMDRjLTZlYmQtNDNjZi05MWRmLWY5NjBmMjcxYzljOC92Mi4wLyIsImV4cCI6MTcyOTEzODQ5OSwibmJmIjoxNzI5MTM0ODk5LCJvaWQiOiI2NTJkZDNiNi00M2VjLTQxZWItODhhMy04OWE3ZjE0ODVlODYiLCJzdWIiOiI2NTJkZDNiNi00M2VjLTQxZWItODhhMy04OWE3ZjE0ODVlODYiLCJnaXZlbl9uYW1lIjoiVXNlciIsImZhbWlseV9uYW1lIjoiVHdvIiwiZW1haWxzIjpbInVzZXIyQGd5YmUuY28iXSwidGZwIjoiQjJDXzFfc2lnbnVwc2lnbmluMSIsInNjcCI6InJlc291cmNlcyIsImF6cCI6ImVkYjYxN2ViLWRjZTgtNDU0YS1hMTIwLTM5MGI5ZGEwMDk2ZiIsInZlciI6IjEuMCIsImlhdCI6MTcyOTEzNDg5OX0.DbW9oAxYvpRX4VICbm_xAzraFrdhLYRM5LTdqRRM-nGT3f55W0EedcBNNMuUGqrtESbx9AQCrOAhdVe1P_X8B0M_uqpblQpAsCfV1EpkFJ67NhRiDt58HYw4VnosbgS8uLJWx068qDwzzN2w5N_qR-XhhgoS0wp8pjMk9bOnDC44cLehTo2rNJjFQ7b52Nmhe2zNwWf4kclbbN3XH0u1OOPmGuswQgvn-3p8iSq-voxf6f7F7BqFOEIFtg7x1IFL8cdPmn5Kj7gxdWDFAyXu7wS2WiHQeKnP-rLgvh0QFB0bH9OiyhSSNj9Rex4mhnGpTViz4VIwg5oHedAxiOihtw';
-    var bearer = `Bearer ${token}`;
-    axios.get(urlDeviceHealthCheck, { headers: {'Authorization': bearer }}).then((response) => {
-      console.log('Device Health Check:', response.data);
-    }).catch((error) => {
-        console.error('Error checking device health:', error);
-    });
-  };
+  // const CheckDeviceHealth = async () => {
+  //   const urlDeviceHealthCheck = 'https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/DeviceHealth';
+  //   var token = 'eyJhbGciOiJSUzI1NiIsImtpZCI6Ilg1ZVhrNHh5b2pORnVtMWtsMll0djhkbE5QNC1jNTdkTzZRR1RWQndhTmsiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiI4OGJlZDI3ZC04NzAyLTQ5ZTAtODM2YS0xYjg2MDYwMzBkOWYiLCJpc3MiOiJodHRwczovL2d5YmViMmNkZXYuYjJjbG9naW4uY29tL2UwYzIxMDRjLTZlYmQtNDNjZi05MWRmLWY5NjBmMjcxYzljOC92Mi4wLyIsImV4cCI6MTcyOTEzODQ5OSwibmJmIjoxNzI5MTM0ODk5LCJvaWQiOiI2NTJkZDNiNi00M2VjLTQxZWItODhhMy04OWE3ZjE0ODVlODYiLCJzdWIiOiI2NTJkZDNiNi00M2VjLTQxZWItODhhMy04OWE3ZjE0ODVlODYiLCJnaXZlbl9uYW1lIjoiVXNlciIsImZhbWlseV9uYW1lIjoiVHdvIiwiZW1haWxzIjpbInVzZXIyQGd5YmUuY28iXSwidGZwIjoiQjJDXzFfc2lnbnVwc2lnbmluMSIsInNjcCI6InJlc291cmNlcyIsImF6cCI6ImVkYjYxN2ViLWRjZTgtNDU0YS1hMTIwLTM5MGI5ZGEwMDk2ZiIsInZlciI6IjEuMCIsImlhdCI6MTcyOTEzNDg5OX0.DbW9oAxYvpRX4VICbm_xAzraFrdhLYRM5LTdqRRM-nGT3f55W0EedcBNNMuUGqrtESbx9AQCrOAhdVe1P_X8B0M_uqpblQpAsCfV1EpkFJ67NhRiDt58HYw4VnosbgS8uLJWx068qDwzzN2w5N_qR-XhhgoS0wp8pjMk9bOnDC44cLehTo2rNJjFQ7b52Nmhe2zNwWf4kclbbN3XH0u1OOPmGuswQgvn-3p8iSq-voxf6f7F7BqFOEIFtg7x1IFL8cdPmn5Kj7gxdWDFAyXu7wS2WiHQeKnP-rLgvh0QFB0bH9OiyhSSNj9Rex4mhnGpTViz4VIwg5oHedAxiOihtw';
+  //   var bearer = `Bearer ${token}`;
+  //   axios.get(urlDeviceHealthCheck, { headers: {'Authorization': bearer }}).then((response) => {
+  //     console.log('Device Health Check:', response.data);
+  //   }).catch((error) => {
+  //       console.error('Error checking device health:', error);
+  //   });
+  // };
 
   useEffect(() => {
     fetchAssignments();
 
     console.log('Checking device health now...');
-    CheckDeviceHealth();
+    // CheckDeviceHealth();
   }, [fetchAssignments]);
 
   useFocusEffect(

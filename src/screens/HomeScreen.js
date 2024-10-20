@@ -62,34 +62,36 @@ const handleSignIn_old = async () => {
     }
   };
 */
-const handleSignIn = async () => {
-    console.log('Sign-in button pressed');
-    promptAsync().then((codeResponse) => {
-      if (request && codeResponse?.type === 'success' && discovery) {
-        console.log('Authorization code: ', codeResponse.params.code);
 
-        exchangeCodeAsync(
-          {
-            clientId,
-            code: codeResponse.params.code,
-            extraParams: request.codeVerifier
-              ? { code_verifier: request.codeVerifier }
-              : undefined,
-            redirectUri,
-          },
-          discovery,
-        ).then((res) => {
+const handleSignIn = async () => {
+  console.log('Sign-in button pressed');
+  try {
+      const codeResponse = await promptAsync();
+      if (request && codeResponse?.type === 'success' && discovery) {
+          console.log('Authorization code: ', codeResponse.params.code);
+
+          const res = await exchangeCodeAsync(
+              {
+                  clientId,
+                  code: codeResponse.params.code,
+                  extraParams: request.codeVerifier
+                      ? { code_verifier: request.codeVerifier }
+                      : undefined,
+                  redirectUri,
+              },
+              discovery,
+          );
+
           console.log('Access token: ', res.accessToken);
           setToken(res.accessToken);
-          navigation.navigate('Assignments'); // Navigate to the next screen
-        }).catch((error) => {
-          console.error('Failed to exchange code:', error);
-        });
+          
+          // Pass the access token to the Assignments screen
+          navigation.navigate('Assignments', { accessToken: res.accessToken });
       }
-    }).catch((error) => {
-      console.error('Failed to prompt:', error);
-    });
-  };
+  } catch (error) {
+      console.error('Sign-in failed:', error);
+  }
+};
 
   return (
     <View style={styles.container}>
