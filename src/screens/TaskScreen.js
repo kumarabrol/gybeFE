@@ -135,11 +135,12 @@ const TaskScreen = ({ navigation }) => {
   
       if (selectedAssignment) {
         setSelectedAssignmentId(assignmentId);
-        
+        console.log(`assignmentId: ${assignmentId}`);
+        console.log(selectedAssignment.tasks.length);
         // Check if the assignment has only one task
         if (selectedAssignment.tasks.length === 1) {
           // Navigate directly to TaskDetail screen
-          navigation.navigate("TaskDetail", {
+          navigation.navigate("Task-Details", {
             assignmentId: assignmentId,
             detailedData: selectedAssignment,
             alltasks: selectedAssignment.tasks
