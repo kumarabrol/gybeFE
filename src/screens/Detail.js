@@ -92,7 +92,8 @@ const DetailScreen = ({ navigation, route }) => {
         type: route.params.type,
         detailedData : selectedTask,
         alltasks: tasks,
-        entire : route.params
+        entire : route.params,
+        selectedTask: selectedTask
 
       });
 

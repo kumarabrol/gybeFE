@@ -31,7 +31,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const { assignmentId , detailedData , alltasks} = route.params;
+  const { assignmentId , detailedData , alltasks, selectedTask} = route.params;
   const [isConnected, setIsConnected] = useState(true);
 
   
@@ -62,27 +62,33 @@ const TaskDetailScreen = ({ navigation, route }) => {
       if (alltasks) {
         setTasks(alltasks);
         console.log('all tasks:', JSON.stringify(alltasks, null, 2));
-
+  
         // Initialize responses with proper structure
         const initialResponses = {};
         alltasks.forEach(task => {
           task.fields.forEach(field => {
             initialResponses[field.assignmentTaskFieldID] = {
-              value: field.response || '',  // Provide default empty string if no response
+              value: field.response || '',  
               status: false
             };
           });
         });
-
-         console.log('Initializing taskResponses:', initialResponses);
+  
+        console.log('Initializing taskResponses:', initialResponses);
+        console.log('selectedTask :', JSON.stringify(selectedTask, null, 2));
         setTaskResponses(initialResponses);
+  
+        // Find the index of the selected task
+        const selectedTaskIndex = alltasks.findIndex(task => task.id === selectedTask.id);
+        setCurrentTaskIndex(selectedTaskIndex !== -1 ? selectedTaskIndex : 0);
+  
         setLoading(false);
       } else {
         console.error('No detailed data provided in route params');
         Alert.alert('Error', 'Failed to load task data. Please go back and try again.');
         setLoading(false);
       }
-    }, [alltasks])
+    }, [alltasks, selectedTask])
   );
 
   const handleGesture = Animated.event(
