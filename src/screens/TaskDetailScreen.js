@@ -273,20 +273,30 @@ const TaskDetailScreen = ({ navigation, route }) => {
 
 
 
-const renderField = (field) => {
+  const renderField = (field) => {
     switch (field.inputFormTaskInputType) {
       case InputFormTaskInputType.Label:
         return (
-          <View style={styles.fieldContainer}>
-            <Text style={styles.labelText}>{field.detail}</Text>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <Text style={[styles.labelText, { flex: 0.7, fontSize: 16 }]}>{field.detail}</Text>
           </View>
         );
+  
       case InputFormTaskInputType.TextBox:
         return (
-          <View style={[styles.fieldContainer, { justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={styles.labelText}>{field.fieldLabel}</Text>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
             <TextInput
-              style={[styles.textInput, { width: width * 0.8 , height: 50 }] }
+              style={[styles.textInput, { flex: 0.7 }]}
               placeholder={field.detail}
               value={taskResponses[field.assignmentTaskFieldID]?.value}
               onChangeText={(text) => handleInputChange(field.assignmentTaskFieldID, text)}
@@ -295,14 +305,19 @@ const renderField = (field) => {
             />
           </View>
         );
+  
       case InputFormTaskInputType.DropDown:
         const options = field.detail.split(',').map(option => option.trim());
         return (
-          <View style={[styles.fieldContainer, { justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={styles.labelText}>{field.fieldLabel}</Text>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
             <Picker
               selectedValue={taskResponses[field.assignmentTaskFieldID]?.value}
-              style={[styles.dropfieldContainer, { width: width * 0.8 }]}
+              style={[styles.dropfieldContainer, { flex: 0.7 }]}
               mode="dialog"
               onValueChange={(itemValue) => handleInputChange(field.assignmentTaskFieldID, itemValue)}
             >
@@ -313,45 +328,65 @@ const renderField = (field) => {
             </Picker>
           </View>
         );
-      case InputFormTaskInputType.CheckBox:
-        return (
-          <TouchableOpacity 
-            style={styles.fieldContainer} 
-            onPress={() => handleInputChange(field.assignmentTaskFieldID, !taskResponses[field.assignmentTaskFieldID]?.value)}
-          >
-            <Text style={styles.checkMark}>
-              {taskResponses[field.assignmentTaskFieldID]?.value ? "✓" : "✓"}
-            </Text>
-            <Text style={styles.checkboxLabel}></Text>
-          </TouchableOpacity>
-        );
+  
+        case InputFormTaskInputType.CheckBox:
+          return (
+            <View style={[styles.fieldContainer, {
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 20
+            }]}>
+              <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+              <TouchableOpacity 
+                onPress={() => handleInputChange(field.assignmentTaskFieldID, !taskResponses[field.assignmentTaskFieldID]?.value)}
+                style={[styles.checkboxContainer, { flex: 0.7 }]}
+              >
+                <View style={styles.checkbox}>
+                  {taskResponses[field.assignmentTaskFieldID]?.value && (
+                    <MaterialIcons name="check" size={20} color="#ffcc00" />
+                  )}
+                </View>
+              </TouchableOpacity>
+            </View>
+          );
+  
       case InputFormTaskInputType.Button:
         return (
-          <View style={styles.buttonContainer}>
-            {field.detail.split(';').map((option, index) => (
-              <TouchableOpacity
-                key={`${field.inputFormTaskFieldID}-button-${index}`}
-                style={[styles.button, { width: width * 0.8 }]}
-                onPress={() => handleInputChange(field.assignmentTaskFieldID, option)}
-              >
-                <Text style={styles.buttonText}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <View style={{ flex: 0.7 }}>
+              {field.detail.split(';').map((option, index) => (
+                <TouchableOpacity
+                  key={`${field.inputFormTaskFieldID}-button-${index}`}
+                  style={styles.button}
+                  onPress={() => handleInputChange(field.assignmentTaskFieldID, option)}
+                >
+                  <Text style={styles.buttonText}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         );
+  
       case InputFormTaskInputType.PF:
         return (
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>{field.detail}</Text>
-            <View style={styles.pfButtonContainer}>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <View style={[styles.pfButtonContainer, { flex: 0.7 }]}>
               {field.detail.split(';').map((option, index) => (
                 <TouchableOpacity 
                   key={`${field.assignmentTaskFieldID}-pf-${index}`}
                   style={[
                     styles.pfButton,
-                    taskResponses[field.assignmentTaskFieldID]?.value === option && styles.pfButtonSelected,
-                    { width: (width * 0.8) / field.detail.split(';').length }
+                    taskResponses[field.assignmentTaskFieldID]?.value === option && styles.pfButtonSelected
                   ]}
                   onPress={() => handleInputChange(field.assignmentTaskFieldID, option)}
                 >
@@ -361,39 +396,38 @@ const renderField = (field) => {
             </View>
           </View>
         );
+  
       case InputFormTaskInputType.CaptureImage:
         return (
-          <View style={{ width: 400, alignItems: 'center'}}>
-            <TouchableOpacity
-              style={styles.cameraButton}
-              onPress={() => handleCaptureImage(field.assignmentTaskFieldID)}
-            >
-              <MaterialIcons name="camera-alt" size={30}  color="#fff" />
-            </TouchableOpacity>
-            {taskResponses[field.assignmentTaskFieldID]?.value && (
-              <View>
-                <Text style={styles.imageCapturedText}>Image captured</Text>
-                <View style={styles.imagePlaceholder}>
-                  <Text style={styles.imagePlaceholderText}>Image Preview</Text>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <View style={{ flex: 0.7, alignItems: 'flex-start' }}>
+              <TouchableOpacity
+                style={styles.cameraButton}
+                onPress={() => handleCaptureImage(field.assignmentTaskFieldID)}
+              >
+                <MaterialIcons name="camera-alt" size={30} color="#fff" />
+              </TouchableOpacity>
+              {taskResponses[field.assignmentTaskFieldID]?.value && (
+                <View>
+                  <Text style={styles.imageCapturedText}>Image captured</Text>
+                  <View style={styles.imagePlaceholder}>
+                    <Text style={styles.imagePlaceholderText}>Image Preview</Text>
+                  </View>
                 </View>
-              </View>
-            )}
+              )}
+            </View>
           </View>
         );
+  
       default:
         return null;
     }
   };
-
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#ffcc00" />
-      </View>
-    );
-  }
- 
 
 
   // console.log(' tasks on:', JSON.stringify(tasks, null, 2));
@@ -522,24 +556,27 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   fieldContainer: {
-    alignItems: 'left',
     marginBottom: 20,
+    width: '100%'
   },
   dropfieldContainer: {
     backgroundColor: 'white',
     borderRadius: 5,
+    height: 50
   },
   fieldLabel: {
     color: '#fff',
     fontSize: 18,
     marginBottom: 10,
   },
+
   textInput: {
-    backgroundColor: '#fff',
-    padding: 10,
+    backgroundColor: 'white',
+  
     borderRadius: 5,
     fontSize: 16,
     textAlignVertical: 'top',
+    minHeight: 20
   },
   checkMark: {
     color: 'white',
@@ -552,12 +589,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 10,
   },
+
   button: {
     backgroundColor: '#ffcc00',
     padding: 10,
     borderRadius: 5,
-    marginVertical: 5,
-    alignItems: 'center',
+    marginVertical: 2,
+    alignItems: 'center'
   },
   buttonText: {
     fontSize: 16,
@@ -570,13 +608,14 @@ const styles = StyleSheet.create({
   },
   pfButtonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'flex-start'
   },
   pfButton: {
     backgroundColor: '#ffcc00',
-    padding: 15,
+    padding: 10,
     borderRadius: 5,
-    marginHorizontal: 5,
+    marginRight: 5,
+    flex: 1
   },
   pfButtonText: {
     color: '#000',
@@ -630,8 +669,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffcc00',
     padding: 5,
     borderRadius: 500,
-    alignItems: 'center',
-    justifyContent: 'center',
+   
+    right: 90,
   },
   container: {
     flex: 1,
@@ -666,8 +705,8 @@ const styles = StyleSheet.create({
   },
   labelText: {
     color: '#fff',
-    fontSize: 20,
-    textAlign: 'left',
+    fontSize: 16,
+    marginRight: 10
   },
   imageCapturedText: {
     color: '#fff',
@@ -680,8 +719,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 50,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
+    justifyContent: 'center'
   },
   imageCapturedText: {
     color: '#fff',
@@ -701,7 +739,21 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 12,
   },
-  
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#ffcc00',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent'
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    // paddingHorizontal: 20
+  }
 
 });
 

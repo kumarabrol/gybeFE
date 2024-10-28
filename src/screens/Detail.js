@@ -156,7 +156,7 @@ const DetailScreen = ({ navigation, route }) => {
           hasResponse && styles.taskWithResponse,
           !hasResponse && styles.taskWithoutResponse,
           isCompleted && styles.completedTaskItem,
-          item.id === selectedTaskId && styles.selectedTaskItem
+          item.id === selectedTaskId 
         ]}
         onPress={() => handleStartPress(item.id)}
       >

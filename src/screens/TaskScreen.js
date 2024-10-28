@@ -132,16 +132,28 @@ const TaskScreen = ({ navigation }) => {
       const selectedAssignment = assignments.find(
         (assignment) => assignment.id === assignmentId
       );
-
+  
       if (selectedAssignment) {
         setSelectedAssignmentId(assignmentId);
-        navigation.navigate("Task", {
-          assignmentId: assignmentId,
-          name: selectedAssignment.name,
-          instructions: selectedAssignment.instructions,
-          type: selectedAssignment.assignmentType,
-          tasks: selectedAssignment.tasks,
-        });
+        
+        // Check if the assignment has only one task
+        if (selectedAssignment.tasks.length === 1) {
+          // Navigate directly to TaskDetail screen
+          navigation.navigate("TaskDetail", {
+            assignmentId: assignmentId,
+            detailedData: selectedAssignment,
+            alltasks: selectedAssignment.tasks
+          });
+        } else {
+          // Navigate to Task screen for multiple tasks
+          navigation.navigate("Task", {
+            assignmentId: assignmentId,
+            name: selectedAssignment.name,
+            instructions: selectedAssignment.instructions,
+            type: selectedAssignment.assignmentType,
+            tasks: selectedAssignment.tasks,
+          });
+        }
       }
     },
     [assignments, navigation]
