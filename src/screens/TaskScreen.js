@@ -78,16 +78,18 @@ const TaskScreen = ({ navigation }) => {
           "https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1"
         );
 
+        
+
         fetchedAssignments = response.data.map((assignment) => ({
           id: assignment.assignmentId.toString(),
           name: assignment.name,
           assignmentType: assignment.assignmentType,
-          status: assignment.assignmentStatus || 0,
-          startDate: assignment.startTime
-            ? new Date(assignment.startTime)
-            : null,
-          endDate: assignment.endTime ? new Date(assignment.endTime) : null,
-          instructions: assignment.tasks[0]?.fields.find(
+          //status: assignment.assignmentStatus || 0,
+          //startDate: assignment.startTime
+           // ? new Date(assignment.startTime)
+           // : null,
+          //endDate: assignment.endTime ? new Date(assignment.endTime) : null,
+          tasks: assignment.tasks[0]?.fields.find(
               (field) => field.fieldLabel === "Instruction:"
             )?.detail ||
             assignment.tasks[0]?.fields.find(
@@ -104,7 +106,13 @@ const TaskScreen = ({ navigation }) => {
           throw new Error("No stored assignments available");
         }
       }
-
+      fetchedAssignments.forEach((assignment) => {
+        console.log(`Assignment: ${assignment.name}`);
+        
+        assignment.tasks.forEach((task, index) => {
+          console.log(`Task ${index + 1}: ${task.name} - ${task.assignmentTaskID}`);
+        });
+      });
       setAssignments(fetchedAssignments);
       setError(null);
     } catch (error) {
@@ -174,17 +182,17 @@ const TaskScreen = ({ navigation }) => {
           <Text style={styles.greeting}>Hi Terry!</Text>
           <Text style={styles.queueText}>Pending Assignments are:</Text>
         </View>
-        <TouchableOpacity
+        {/*<TouchableOpacity
           style={[
             styles.toggleButton,
             { backgroundColor: isOnline ? "#4CAF50" : "#F44336" },
           ]}
           onPress={toggleConnection}
         >
-          <Text style={styles.toggleButtonText}>
+         } <Text style={styles.toggleButtonText}>
             {isOnline ? "Go Offline" : "Go Online"}
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity>*/}
       </View>
       <FlatList
         style={styles.assignmentsWrapper}
@@ -208,6 +216,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 20,
     alignItems: "center",
+    width: "100%"
   },
   greeting: {
     fontSize: 24,

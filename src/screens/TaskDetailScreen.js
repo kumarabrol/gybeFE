@@ -7,7 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { AntDesign } from '@expo/vector-icons'; 
 // import NetInfo from '@react-native-community/netinfo';
-// import * as ImagePicker from 'expo-image-picker'; // Add this import
+//import * as ImagePicker from 'expo-image-picker'; // Add this import
 // import * as FileSystem from 'expo-file-system';
 import {AsyncStorage} from 'react-native';
 
@@ -74,7 +74,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
           });
         });
 
-        // console.log('Initializing taskResponses:', initialResponses);
+         console.log('Initializing taskResponses:', initialResponses);
         setTaskResponses(initialResponses);
         setLoading(false);
       } else {
@@ -139,7 +139,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
       };
       
       // Log the state update
-      // console.log('Updated taskResponses:', newResponses);
+       console.log('Updated taskResponses:', newResponses);
       return newResponses;
     });
   };
@@ -173,7 +173,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
         }
 
         const base64ImageWithPrefix = `data:image/jpeg;base64,${base64Image}`;
-        handleInputChange(fieldId, base64ImageWithPrefix);
+        //handleInputChange(fieldId, base64ImageWithPrefix);
       }
     } catch (error) {
       console.error('Error capturing image:', error);
@@ -192,27 +192,25 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }
   };
 
- 
-
-
-  
-
-
-
   const handleSubmitAndGoBack = async () => {
     setSubmitting(true);
     try {
+      console.log('tasks...205...',tasks)
       const formattedTasks = tasks.map(task => ({
-        inputFormTaskID: task.inputFormTaskID,
+        //inputFormTaskID: task.inputFormTaskID,
         taskSequence: task.taskSequence,
+        assignmentTaskID: task.id,
         name: task.name,
+        startTime: task.startTime,
+        userClickedSave: task.userClickedSave,
         fields: task.fields.map(field => ({
           inputFormTaskFieldID: field.inputFormTaskFieldID,
+          assignmentTaskFieldID: field.assignmentTaskFieldID,
           fieldSequence: field.fieldSequence,
+          fieldLabel: field.fieldLabel,
           inputFormTaskInputType: field.inputFormTaskInputType,
           detail: field.detail,
-          response: taskResponses[field.as]?.value.toString(),
-          inputFormCellLocation: field.inputFormCellLocation || ''
+          response: taskResponses[field.assignmentTaskFieldID]?.value
         }))
       }));
 
@@ -221,15 +219,15 @@ const TaskDetailScreen = ({ navigation, route }) => {
 
       const payload = {
         assignmentId: assignmentId,
-        deviceId: 1,
+        deviceId: -1,
         tasks: formattedTasks
       };
 
       console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       const response = await axios.put(
-        'https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/RecordAssignmentWork',
-        payload,
+        'https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/RecordAssignmentWork',
+        [payload],
         {
           headers: {
             'Content-Type': 'application/json',
@@ -286,6 +284,7 @@ const renderField = (field) => {
       case InputFormTaskInputType.TextBox:
         return (
           <View style={[styles.fieldContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={styles.labelText}>{field.fieldLabel}</Text>
             <TextInput
               style={[styles.textInput, { width: width * 0.8 , height: 50 }] }
               placeholder={field.detail}
@@ -297,9 +296,10 @@ const renderField = (field) => {
           </View>
         );
       case InputFormTaskInputType.DropDown:
-        const options = field.fieldLabel.split(';').map(option => option.trim());
+        const options = field.detail.split(',').map(option => option.trim());
         return (
           <View style={[styles.fieldContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={styles.labelText}>{field.fieldLabel}</Text>
             <Picker
               selectedValue={taskResponses[field.assignmentTaskFieldID]?.value}
               style={[styles.dropfieldContainer, { width: width * 0.8 }]}
@@ -337,6 +337,7 @@ const renderField = (field) => {
                 <Text style={styles.buttonText}>{option}</Text>
               </TouchableOpacity>
             ))}
+
           </View>
         );
       case InputFormTaskInputType.PF:
@@ -412,7 +413,7 @@ const renderField = (field) => {
           
       <View style={styles.networkToggle}>
        
-        <TouchableOpacity
+        {/*<TouchableOpacity
           style={[
             styles.toggleButton,
             { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
@@ -421,8 +422,8 @@ const renderField = (field) => {
         >
           <Text style={styles.toggleButtonText}>
             {isConnected ? 'Go Offline' : 'Go Online'}
-          </Text>
-        </TouchableOpacity>
+          </Text> 
+        </TouchableOpacity>*/}
       </View> 
           
           
