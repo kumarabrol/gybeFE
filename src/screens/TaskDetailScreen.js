@@ -6,6 +6,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { AntDesign } from '@expo/vector-icons'; 
+// import NetInfo from '@react-native-community/netinfo';
+//import * as ImagePicker from 'expo-image-picker'; // Add this import
+// import * as FileSystem from 'expo-file-system';
+import {AsyncStorage} from 'react-native';
 
 const InputFormTaskInputType = {
   Label: 0,
@@ -27,8 +31,13 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const { assignmentId } = route.params;
+  const { assignmentId , detailedData , alltasks, selectedTask} = route.params;
+  const [isConnected, setIsConnected] = useState(true);
 
+  
+
+
+  
   const pan = useRef(new Animated.ValueXY()).current;
 
   useEffect(() => {
@@ -47,48 +56,61 @@ const TaskDetailScreen = ({ navigation, route }) => {
     };
   }, []);
 
+
   useFocusEffect(
     React.useCallback(() => {
-      const fetchTasks = async () => {
-        try {
-
-         const { assignmentId } = route.params
-         console.log('assignmentId...',route.params)
-         const response = await axios.get(`https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/${assignmentId}`);
-
-          //const response = await axios.get(`https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/AssignmentTasksNew/16`);
-          setTasks(response.data.tasks);
-          
-          const initialResponses = response.data.tasks.reduce((acc, task) => {
-            task.fields.forEach(field => {
-              acc[field.inputFormTaskFieldID] = { 
-                value: field.response,
-                status: false 
-              };
-            });
-            return acc;
-          }, {});
-          setTaskResponses(initialResponses);
-        } catch (error) {
-          console.error('Error fetching tasks:', error);
-          Alert.alert('Error', 'Failed to fetch tasks. Please try again.');
-        } finally {
-          setLoading(false);
+      if (alltasks) {
+        setTasks(alltasks);
+        //console.log('all tasks:', JSON.stringify(alltasks, null, 2));
+  
+        // Initialize responses with proper structure
+        const initialResponses = {};
+        alltasks.forEach(task => {
+          task.fields.forEach(field => {
+            initialResponses[field.assignmentTaskFieldID] = {
+              value: field.response || '',  
+              status: false
+            };
+          });
+        });
+  
+        //console.log('Initializing taskResponses:', initialResponses);
+        //console.log('Initializing alltasks:', alltasks);
+        let baseSelTask;
+        if(selectedTask === undefined){
+          baseSelTask=alltasks[0].assignmentTaskID
+          //selectedTask = alltasks[0];
         }
-      };
+        else{
+          baseSelTask=selectedTask.id;
+        }
 
-      fetchTasks();
-      return () => {
-        // Clean up function if needed
-      };
-    }, [assignmentId])
+        //console.log('selectedTask :', JSON.stringify(selectedTask, null, 2));
+        setTaskResponses(initialResponses);
+      //  console.log('Initializing alltasks:', alltasks);
+  
+        // Find the index of the selected task
+        const selectedTaskIndex = alltasks.findIndex(task => task.id === baseSelTask);
+       // console.log('Initializing taskResponses:', initialResponses);
+        setCurrentTaskIndex(selectedTaskIndex !== -1 ? selectedTaskIndex : 0);
+  
+        setLoading(false);
+      } else {
+        console.error('No detailed data provided in route params');
+        Alert.alert('Error', 'Failed to load task data. Please go back and try again.');
+        setLoading(false);
+      }
+    }, [alltasks, selectedTask])
   );
 
   const handleGesture = Animated.event(
     [{ nativeEvent: { translationY: pan.y } }],
     { useNativeDriver: false }
   );
-
+  
+  const toggleConnection = () => {
+    setIsConnected(!isConnected);
+  };
   const handleStateChange = ({ nativeEvent }) => {
     if (nativeEvent.oldState === State.ACTIVE) {
       if (nativeEvent.translationY > DRAG_THRESHOLD) {
@@ -123,18 +145,59 @@ const TaskDetailScreen = ({ navigation, route }) => {
   };
 
   const handleInputChange = (fieldId, value) => {
-    console.log('Field ID:', fieldId, 'Value:', value);
-    setTaskResponses(prevResponses => ({
-      ...prevResponses,
-      [fieldId]: { value: value, status: true }
-    }));
+    // console.log('HandleInputChange called with:', { fieldId, value });
+    
+    setTaskResponses(prevResponses => {
+      const newResponses = {
+        ...prevResponses,
+        [fieldId]: {
+          value: value,
+          status: true
+        }
+      };
+      
+      // Log the state update
+       //console.log('Updated taskResponses:', newResponses);
+      return newResponses;
+    });
   };
-
-  const handleCaptureImage = (fieldId) => {
+  const handleCaptureImage = async (fieldId) => {
     console.log('Capture image for field:', fieldId);
-    Alert.alert('Image Capture', 'Image capture functionality to be implemented.');
-  };
+    
+    // Request camera permissions
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Sorry, we need camera permissions to make this work!');
+      return;
+    }
 
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        console.log('Image captured');
+        
+        let base64Image = asset.base64;
+        if (!base64Image) {
+          const fileUri = asset.uri;
+          base64Image = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.Base64 });
+        }
+
+        const base64ImageWithPrefix = `data:image/jpeg;base64,${base64Image}`;
+        //handleInputChange(fieldId, base64ImageWithPrefix);
+      }
+    } catch (error) {
+      console.error('Error capturing image:', error);
+      Alert.alert('Error', 'Failed to capture image. Please try again.');
+    }
+  };
   const handleNextTask = () => {
     if (currentTaskIndex < tasks.length - 1) {
       setCurrentTaskIndex(prevIndex => prevIndex + 1);
@@ -150,17 +213,22 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const handleSubmitAndGoBack = async () => {
     setSubmitting(true);
     try {
+      //console.log('tasks...205...',tasks)
       const formattedTasks = tasks.map(task => ({
-        inputFormTaskID: task.inputFormTaskID,
+        //inputFormTaskID: task.inputFormTaskID,
         taskSequence: task.taskSequence,
+        assignmentTaskID: task.id?? task.assignmentTaskID,
         name: task.name,
+        startTime: task.startTime,
+        userClickedSave: task.userClickedSave,
         fields: task.fields.map(field => ({
           inputFormTaskFieldID: field.inputFormTaskFieldID,
+          assignmentTaskFieldID: field.assignmentTaskFieldID,
           fieldSequence: field.fieldSequence,
+          fieldLabel: field.fieldLabel,
           inputFormTaskInputType: field.inputFormTaskInputType,
           detail: field.detail,
-          response: taskResponses[field.inputFormTaskFieldID]?.value.toString(),
-          inputFormCellLocation: field.inputFormCellLocation || ''
+          response: taskResponses[field.assignmentTaskFieldID]?.value.toString()
         }))
       }));
 
@@ -169,15 +237,15 @@ const TaskDetailScreen = ({ navigation, route }) => {
 
       const payload = {
         assignmentId: assignmentId,
-        deviceId: 1,
+        deviceId: -1,
         tasks: formattedTasks
       };
 
-      console.log('Submitting payload:', JSON.stringify(payload, null, 2));
+      //console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       const response = await axios.put(
-        'https://gbapiks.lemonriver-6b83669d.australiaeast.azurecontainerapps.io/api/Assignment/RecordAssignmentWork',
-        payload,
+        'https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/RecordAssignmentWork',
+        [payload],
         {
           headers: {
             'Content-Type': 'application/json',
@@ -186,7 +254,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
         }
       );
 
-      console.log('Submit response:', response.data);
+      //console.log('Submit response:', response.data);
       Alert.alert('Success', 'Responses submitted successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
@@ -219,85 +287,126 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }
   };
 
+
+
+
+
   const renderField = (field) => {
     switch (field.inputFormTaskInputType) {
       case InputFormTaskInputType.Label:
         return (
-          <View key={field.inputFormTaskFieldID} style={styles.fieldContainer}>
-            <Text style={styles.labelText}>{field.detail}</Text>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
+            <Text style={[styles.labelText, { flex: 0.7, fontSize: 16 }]}>{field.detail}</Text>
           </View>
         );
+  
       case InputFormTaskInputType.TextBox:
         return (
-          <View style={[styles.fieldContainer, { justifyContent: 'center', alignItems: 'center' }]} key={field.inputFormTaskFieldID}>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
             <TextInput
-              style={[styles.textInput, { width: width * 0.8 , height: 50 }] }
+              style={[styles.textInput, { flex: 0.7 }]}
               placeholder={field.detail}
-              value={taskResponses[field.inputFormTaskFieldID]?.value}
-              onChangeText={(text) => handleInputChange(field.inputFormTaskFieldID, text)}
+              value={taskResponses[field.assignmentTaskFieldID]?.value}
+              onChangeText={(text) => handleInputChange(field.assignmentTaskFieldID, text)}
               multiline={true}
               numberOfLines={4}
             />
           </View>
         );
+  
       case InputFormTaskInputType.DropDown:
-        const options = field.detail.split(';').map(option => option.trim());
+        const options = field.detail.split(',').map(option => option.trim());
         return (
-          <View style={[styles.fieldContainer, { justifyContent: 'center', alignItems: 'center' }]} key={field.inputFormTaskFieldID}>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
             <Picker
-              selectedValue={taskResponses[field.inputFormTaskFieldID]?.value}
-              style={[styles.dropfieldContainer, { width: width * 0.8 }]}
+              selectedValue={taskResponses[field.assignmentTaskFieldID]?.value}
+              style={[styles.dropfieldContainer, { flex: 0.7 }]}
               mode="dialog"
-              onValueChange={(itemValue) => handleInputChange(field.inputFormTaskFieldID, itemValue)}
+              onValueChange={(itemValue) => handleInputChange(field.assignmentTaskFieldID, itemValue)}
             >
               <Picker.Item label="Select an option" value="" />
               {options.map((option, index) => (
-                <Picker.Item key={index} label={option} value={option} />
+                <Picker.Item key={`${field.inputFormTaskFieldID}-option-${index}`} label={option} value={option} />
               ))}
             </Picker>
           </View>
         );
-      case InputFormTaskInputType.CheckBox:
-        return (
-          <TouchableOpacity 
-            style={styles.fieldContainer} 
-            key={field.inputFormTaskFieldID}
-            onPress={() => handleInputChange(field.inputFormTaskFieldID, !taskResponses[field.inputFormTaskFieldID]?.value)}
-          >
-            <Text style={styles.checkMark}>
-              {taskResponses[field.inputFormTaskFieldID]?.value ? "✓" : "✓"}
-            </Text>
-            <Text style={styles.checkboxLabel}></Text>
-          </TouchableOpacity>
-        );
+  
+        case InputFormTaskInputType.CheckBox:
+          return (
+            <View style={[styles.fieldContainer, {
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 20
+            }]}>
+              <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
+              <TouchableOpacity 
+                onPress={() => handleInputChange(field.assignmentTaskFieldID, !taskResponses[field.assignmentTaskFieldID]?.value)}
+                style={[styles.checkboxContainer, { flex: 0.7 }]}
+              >
+                <View style={styles.checkbox}>
+                  {taskResponses[field.assignmentTaskFieldID]?.value && (
+                    <MaterialIcons name="check" size={20} color="#ffcc00" />
+                  )}
+                </View>
+              </TouchableOpacity>
+            </View>
+          );
+  
       case InputFormTaskInputType.Button:
         return (
-          <View style={styles.buttonContainer} key={field.inputFormTaskFieldID}>
-            {field.detail.split(';').map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.button, { width: width * 0.8 }]}
-                onPress={() => handleInputChange(field.inputFormTaskFieldID, option)}
-              >
-                <Text style={styles.buttonText}>{option}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
+            <View style={{ flex: 0.7 }}>
+              {field.detail.split(';').map((option, index) => (
+                <TouchableOpacity
+                  key={`${field.inputFormTaskFieldID}-button-${index}`}
+                  style={styles.button}
+                  onPress={() => handleInputChange(field.assignmentTaskFieldID, option)}
+                >
+                  <Text style={styles.buttonText}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         );
+  
       case InputFormTaskInputType.PF:
         return (
-          <View style={styles.fieldContainer} key={field.inputFormTaskFieldID}>
-            <Text style={styles.fieldLabel}>{field.detail}</Text>
-            <View style={styles.pfButtonContainer}>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
+            <View style={[styles.pfButtonContainer, { flex: 0.7 }]}>
               {field.detail.split(';').map((option, index) => (
                 <TouchableOpacity 
-                  key={index}
+                  key={`${field.assignmentTaskFieldID}-pf-${index}`}
                   style={[
                     styles.pfButton,
-                    taskResponses[field.inputFormTaskFieldID]?.value === option && styles.pfButtonSelected,
-                    { width: (width * 0.8) / field.detail.split(';').length }
+                    taskResponses[field.assignmentTaskFieldID]?.value === option && styles.pfButtonSelected
                   ]}
-                  onPress={() => handleInputChange(field.inputFormTaskFieldID, option)}
+                  onPress={() => handleInputChange(field.assignmentTaskFieldID, option)}
                 >
                   <Text style={styles.pfButtonText}>{option}</Text>
                 </TouchableOpacity>
@@ -305,31 +414,45 @@ const TaskDetailScreen = ({ navigation, route }) => {
             </View>
           </View>
         );
+  
       case InputFormTaskInputType.CaptureImage:
         return (
-          <View style={{ width: 400, alignItems: 'center'}} key={field.inputFormTaskFieldID}>
-            <TouchableOpacity
-              style={styles.cameraButton}
-              onPress={() => handleCaptureImage(field.inputFormTaskFieldID)}
-            >
-              <MaterialIcons name="camera-alt" size={30}  color="#fff" />
-            </TouchableOpacity>
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
+            <View style={{ flex: 0.7, alignItems: 'flex-start' }}>
+              <TouchableOpacity
+                style={styles.cameraButton}
+                onPress={() => handleCaptureImage(field.assignmentTaskFieldID)}
+              >
+                <MaterialIcons name="camera-alt" size={30} color="#fff" />
+              </TouchableOpacity>
+              {taskResponses[field.assignmentTaskFieldID]?.value && (
+                <View>
+                  <Text style={styles.imageCapturedText}>Image captured</Text>
+                  <View style={styles.imagePlaceholder}>
+                    <Text style={styles.imagePlaceholderText}>Image Preview</Text>
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
         );
+  
       default:
         return null;
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#ffcc00" />
-      </View>
-    );
-  }
 
+  // console.log(' tasks on:', JSON.stringify(tasks, null, 2));
+      
   const currentTask = tasks[currentTaskIndex];
+  // console.log("currentTask", JSON.stringify(currentTask, null, 2))
+
   const isLastTask = currentTaskIndex === tasks.length - 1;
 
   return (
@@ -339,40 +462,64 @@ const TaskDetailScreen = ({ navigation, route }) => {
         onHandlerStateChange={handleStateChange}
       >
         <Animated.View style={[styles.container, { transform: [{ translateY: pan.y }] }]}>
+          
+      <View style={styles.networkToggle}>
+       
+        {/*<TouchableOpacity
+          style={[
+            styles.toggleButton,
+            { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
+          ]}
+          onPress={toggleConnection}
+        >
+          <Text style={styles.toggleButtonText}>
+            {isConnected ? 'Go Offline' : 'Go Online'}
+          </Text> 
+        </TouchableOpacity>*/}
+      </View> 
+          
+          
           <View style={styles.header}>
             <Text style={styles.headerText}>{currentTask?.name}</Text>
           </View>
           <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
-            {currentTask?.fields.map((field) => renderField(field))}
+         {currentTask?.fields.map((field, index) => (
+        <View key={`${field.inputFormTaskFieldID}-${index}`}>
+          {renderField(field)}
+        </View>
+))}
           </ScrollView>
           {!keyboardVisible && (
-            <View style={styles.navigationContainer}>
-              <TouchableOpacity 
-                style={[styles.navButton, currentTaskIndex === 0 && styles.disabledNavButton]} 
-                onPress={handlePreviousTask}
-                disabled={currentTaskIndex === 0}
-              >
-                <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
-              </TouchableOpacity>
-              {isLastTask ? (
-                <TouchableOpacity 
-                  style={styles.submitButton} 
-                  onPress={handleSubmitAndGoBack}
-                  disabled={submitting}
-                >
-                  <Text style={styles.submitButtonText}>
-                    {submitting ? 'Submitting...' : 'Submit All Responses'}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  style={styles.navButton}
-                  onPress={handleNextTask}
-                >
-                  <Text style={styles.navText}>{'>'}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+           <View style={styles.navigationContainer}>
+           <TouchableOpacity 
+             style={[styles.navButton, currentTaskIndex === 0 && styles.disabledNavButton]} 
+             onPress={handlePreviousTask}
+             disabled={currentTaskIndex === 0}
+           >
+             <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
+           </TouchableOpacity>
+         
+           <TouchableOpacity 
+             style={styles.submitButton} 
+             onPress={handleSubmitAndGoBack}
+             disabled={submitting}
+           >
+             <Text style={styles.submitButtonText}>
+               {submitting ? 'Submitting...' : 'Submit'}
+             </Text>
+           </TouchableOpacity>
+         
+           <TouchableOpacity 
+             style={[styles.navButton, isLastTask && styles.disabledNavButton]}
+             onPress={handleNextTask}
+             disabled={isLastTask}
+           >
+             <Text style={[styles.navText, isLastTask && styles.disabledNavText]}>{'>'}</Text>
+           </TouchableOpacity>
+   
+            
+
+         </View>
           )}
           <View style={styles.arrowContainer}>
           <AntDesign name="arrowdown" size={24} color="#ffcc00" />
@@ -427,41 +574,46 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   fieldContainer: {
-    alignItems: 'left',
     marginBottom: 20,
+    width: '100%'
   },
   dropfieldContainer: {
     backgroundColor: 'white',
     borderRadius: 5,
+    height: 50
   },
   fieldLabel: {
     color: '#fff',
     fontSize: 18,
     marginBottom: 10,
   },
+
   textInput: {
-    backgroundColor: '#fff',
-    padding: 10,
+    backgroundColor: 'white',
+  
     borderRadius: 5,
     fontSize: 16,
     textAlignVertical: 'top',
+    minHeight: 20
   },
   checkMark: {
     color: 'white',
     fontSize: 60,
     fontWeight: 'bold',
+    left: 170,
   },
   checkboxLabel: {
     color: '#fff',
     fontSize: 16,
     marginLeft: 10,
   },
+
   button: {
     backgroundColor: '#ffcc00',
     padding: 10,
     borderRadius: 5,
-    marginVertical: 5,
-    alignItems: 'center',
+    marginVertical: 2,
+    alignItems: 'center'
   },
   buttonText: {
     fontSize: 16,
@@ -474,32 +626,36 @@ const styles = StyleSheet.create({
   },
   pfButtonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'flex-start'
   },
   pfButton: {
     backgroundColor: '#ffcc00',
-    padding: 15,
+    padding: 10,
     borderRadius: 5,
-    marginHorizontal: 5,
+    marginRight: 5,
+    flex: 1
   },
   pfButtonText: {
     color: '#000',
     textAlign: 'center',
     fontSize: 16,
   },
+ 
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     marginBottom: 20,
   },
   navButton: {
     padding: 10,
+    width: 60,
+    alignItems: 'center',
   },
   navText: {
     color: "#fff",
-    fontSize: 50,
+    fontSize: 30,
   },
   disabledNavButton: {
     opacity: 0.5,
@@ -507,34 +663,14 @@ const styles = StyleSheet.create({
   disabledNavText: {
     color: "#888",
   },
-  backButton: {
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 5,
-  },
-  backText: {
-    color: "#fff",
-    fontSize: 20,
-  },
-  labelText: {
-    color: '#fff',
-    fontSize: 20,
-    textAlign: 'left',
-  },
   submitButton: {
     backgroundColor: "#ffcc00",
     justifyContent: "center",
     alignItems: "center",
-    padding: 15,
+    padding: 10,
     borderRadius: 5,
     flex: 1,
-    marginLeft: 10,
+    marginHorizontal: 10,
   },
   submitButtonText: {
     color: "#000",
@@ -551,9 +687,91 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffcc00',
     padding: 5,
     borderRadius: 500,
-    alignItems: 'center',
-    justifyContent: 'center',
+   
+    right: 90,
   },
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  networkToggle: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+  },
+  networkToggleText: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#000',
+  },
+  toggleButton: {
+    padding: 10,
+    borderRadius: 5,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  toggleButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  fieldLabel: {
+    color: '#fff',
+    fontSize: 18,
+    marginBottom: 10,
+  },
+  labelText: {
+    color: '#fff',
+    fontSize: 16,
+    marginRight: 10
+  },
+  imageCapturedText: {
+    color: '#fff',
+    marginTop: 10,
+    fontSize: 16,
+  },
+
+  cameraButton: {
+    backgroundColor: '#ffcc00',
+    padding: 15,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  imageCapturedText: {
+    color: '#fff',
+    marginTop: 10,
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  imagePlaceholder: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  imagePlaceholderText: {
+    color: '#666',
+    fontSize: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#ffcc00',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent'
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    // paddingHorizontal: 20
+  }
 
 });
 
