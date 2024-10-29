@@ -18,7 +18,7 @@ const DetailScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     // Log the entire route.params to debug
-    console.log('Route params received:', JSON.stringify(route.params, null, 2));
+    //console.log('Route params received:', JSON.stringify(route.params, null, 2));
 
     // Check for tasks in the correct location
     if (route.params?.tasks) {
@@ -39,7 +39,7 @@ const DetailScreen = ({ navigation, route }) => {
       
       // Sort tasks by sequence number
       processedTasks.sort((a, b) => a.taskSequence - b.taskSequence);
-      console.log('Processed tasks:', JSON.stringify(processedTasks, null, 2));
+      //console.log('Processed tasks:', JSON.stringify(processedTasks, null, 2));
       setTasks(processedTasks);
     } else if (route.params?.detailedData?.tasks) {
       // Alternative path if tasks are nested in detailedData
@@ -97,7 +97,7 @@ const DetailScreen = ({ navigation, route }) => {
 
       });
 
-    console.log('All tasks:', JSON.stringify(route.params, null, 2));
+    //console.log('All tasks:', JSON.stringify(route.params, null, 2));
 
     }
   };

@@ -61,7 +61,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
     React.useCallback(() => {
       if (alltasks) {
         setTasks(alltasks);
-        console.log('all tasks:', JSON.stringify(alltasks, null, 2));
+        //console.log('all tasks:', JSON.stringify(alltasks, null, 2));
   
         // Initialize responses with proper structure
         const initialResponses = {};
@@ -74,12 +74,24 @@ const TaskDetailScreen = ({ navigation, route }) => {
           });
         });
   
-        console.log('Initializing taskResponses:', initialResponses);
-        console.log('selectedTask :', JSON.stringify(selectedTask, null, 2));
+        //console.log('Initializing taskResponses:', initialResponses);
+        //console.log('Initializing alltasks:', alltasks);
+        let baseSelTask;
+        if(selectedTask === undefined){
+          baseSelTask=alltasks[0].assignmentTaskID
+          //selectedTask = alltasks[0];
+        }
+        else{
+          baseSelTask=selectedTask.id;
+        }
+
+        //console.log('selectedTask :', JSON.stringify(selectedTask, null, 2));
         setTaskResponses(initialResponses);
+      //  console.log('Initializing alltasks:', alltasks);
   
         // Find the index of the selected task
-        const selectedTaskIndex = alltasks.findIndex(task => task.id === selectedTask.id);
+        const selectedTaskIndex = alltasks.findIndex(task => task.id === baseSelTask);
+       // console.log('Initializing taskResponses:', initialResponses);
         setCurrentTaskIndex(selectedTaskIndex !== -1 ? selectedTaskIndex : 0);
   
         setLoading(false);
@@ -145,7 +157,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
       };
       
       // Log the state update
-       console.log('Updated taskResponses:', newResponses);
+       //console.log('Updated taskResponses:', newResponses);
       return newResponses;
     });
   };
@@ -201,11 +213,11 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const handleSubmitAndGoBack = async () => {
     setSubmitting(true);
     try {
-      console.log('tasks...205...',tasks)
+      //console.log('tasks...205...',tasks)
       const formattedTasks = tasks.map(task => ({
         //inputFormTaskID: task.inputFormTaskID,
         taskSequence: task.taskSequence,
-        assignmentTaskID: task.id,
+        assignmentTaskID: task.id?? task.assignmentTaskID,
         name: task.name,
         startTime: task.startTime,
         userClickedSave: task.userClickedSave,
@@ -216,7 +228,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
           fieldLabel: field.fieldLabel,
           inputFormTaskInputType: field.inputFormTaskInputType,
           detail: field.detail,
-          response: taskResponses[field.assignmentTaskFieldID]?.value
+          response: taskResponses[field.assignmentTaskFieldID]?.value.toString()
         }))
       }));
 
@@ -229,7 +241,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
         tasks: formattedTasks
       };
 
-      console.log('Submitting payload:', JSON.stringify(payload, null, 2));
+      //console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       const response = await axios.put(
         'https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/RecordAssignmentWork',
@@ -242,7 +254,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
         }
       );
 
-      console.log('Submit response:', response.data);
+      //console.log('Submit response:', response.data);
       Alert.alert('Success', 'Responses submitted successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
@@ -288,7 +300,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             alignItems: 'center',
             paddingHorizontal: 20
           }]}>
-            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
             <Text style={[styles.labelText, { flex: 0.7, fontSize: 16 }]}>{field.detail}</Text>
           </View>
         );
@@ -300,7 +312,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             alignItems: 'center',
             paddingHorizontal: 20
           }]}>
-            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
             <TextInput
               style={[styles.textInput, { flex: 0.7 }]}
               placeholder={field.detail}
@@ -320,7 +332,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             alignItems: 'center',
             paddingHorizontal: 20
           }]}>
-            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
             <Picker
               selectedValue={taskResponses[field.assignmentTaskFieldID]?.value}
               style={[styles.dropfieldContainer, { flex: 0.7 }]}
@@ -342,7 +354,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
               alignItems: 'center',
               paddingHorizontal: 20
             }]}>
-              <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+              <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
               <TouchableOpacity 
                 onPress={() => handleInputChange(field.assignmentTaskFieldID, !taskResponses[field.assignmentTaskFieldID]?.value)}
                 style={[styles.checkboxContainer, { flex: 0.7 }]}
@@ -363,7 +375,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             alignItems: 'center',
             paddingHorizontal: 20
           }]}>
-            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
             <View style={{ flex: 0.7 }}>
               {field.detail.split(';').map((option, index) => (
                 <TouchableOpacity
@@ -385,7 +397,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             alignItems: 'center',
             paddingHorizontal: 20
           }]}>
-            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
             <View style={[styles.pfButtonContainer, { flex: 0.7 }]}>
               {field.detail.split(';').map((option, index) => (
                 <TouchableOpacity 
@@ -410,7 +422,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             alignItems: 'center',
             paddingHorizontal: 20
           }]}>
-            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}</Text>
+            <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
             <View style={{ flex: 0.7, alignItems: 'flex-start' }}>
               <TouchableOpacity
                 style={styles.cameraButton}

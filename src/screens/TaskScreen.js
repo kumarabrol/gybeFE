@@ -93,7 +93,7 @@ const TaskScreen = ({ navigation }) => {
               (field) => field.fieldLabel === "Instruction:"
             )?.detail ||
             assignment.tasks[0]?.fields.find(
-              (field) => field.fieldLabel === "Description"
+              (field) => field.fieldLabel === "Description:"
             )?.detail ||
             "No instructions available",
           tasks: assignment.tasks,
@@ -106,13 +106,7 @@ const TaskScreen = ({ navigation }) => {
           throw new Error("No stored assignments available");
         }
       }
-      fetchedAssignments.forEach((assignment) => {
-        console.log(`Assignment: ${assignment.name}`);
-        
-        assignment.tasks.forEach((task, index) => {
-          console.log(`Task ${index + 1}: ${task.name} - ${task.assignmentTaskID}`);
-        });
-      });
+
       setAssignments(fetchedAssignments);
       setError(null);
     } catch (error) {
