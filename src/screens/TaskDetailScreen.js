@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard, Animated, Image } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect } from '@react-navigation/native';
@@ -287,10 +287,6 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }
   };
 
-
-
-
-
   const renderField = (field) => {
     switch (field.inputFormTaskInputType) {
       case InputFormTaskInputType.Label:
@@ -301,7 +297,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             paddingHorizontal: 20
           }]}>
             <Text style={[styles.labelText, { flex: 0.3 }]}>{field.fieldLabel}:</Text>
-            <Text style={[styles.labelText, { flex: 0.7, fontSize: 16 }]}>{field.detail}</Text>
+            <Text style={[styles.labelText, { flex: 0.7,  }]}>{field.detail}</Text>
           </View>
         );
   
@@ -368,7 +364,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
             </View>
           );
   
-      case InputFormTaskInputType.Button:
+     {/*} case InputFormTaskInputType.Button:
         return (
           <View style={[styles.fieldContainer, {
             flexDirection: 'row',
@@ -388,8 +384,35 @@ const TaskDetailScreen = ({ navigation, route }) => {
               ))}
             </View>
           </View>
+        ); */}
+
+    case InputFormTaskInputType.Button:
+  // Rename the variable from `options` to `radioOptions`
+      const radioOptions = field.detail.split(',').map(option => option.trim());
+      console.log(radioOptions);
+        return (
+          <View style={[styles.fieldContainer, {
+            flexDirection: 'row', // Stack radio buttons vertically
+            alignItems: 'center',
+            paddingHorizontal: 20
+          }]}>
+            <Text style={[styles.labelText,  { flex: 0.55 }]}>{field.fieldLabel}:</Text>
+            {radioOptions.map((option, index) => (
+              <TouchableOpacity
+                key={`${field.inputFormTaskFieldID}-option-${index}`}
+                style={[styles.radioOptionContainer ,  { flex: 0.7 }]}
+                onPress={() => handleInputChange(field.assignmentTaskFieldID, option)}
+              >
+                <View style={[
+                  styles.radioCircle,
+                  taskResponses[field.assignmentTaskFieldID]?.value === option && styles.radioCircleSelected
+                ]} />
+                <Text style={styles.radioLabel}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         );
-  
+
       case InputFormTaskInputType.PF:
         return (
           <View style={[styles.fieldContainer, {
@@ -456,32 +479,19 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const isLastTask = currentTaskIndex === tasks.length - 1;
 
   return (
+    <View style={styles.container}>
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PanGestureHandler
-        onGestureEvent={handleGesture}
-        onHandlerStateChange={handleStateChange}
-      >
+    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Image
+          source={require('./assets/left-arrow.png')} // Ensure this path is correct
+          style={styles.backButtonImage}
+        />
+      </TouchableOpacity>
         <Animated.View style={[styles.container, { transform: [{ translateY: pan.y }] }]}>
-          
-      <View style={styles.networkToggle}>
-       
-        {/*<TouchableOpacity
-          style={[
-            styles.toggleButton,
-            { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
-          ]}
-          onPress={toggleConnection}
-        >
-          <Text style={styles.toggleButtonText}>
-            {isConnected ? 'Go Offline' : 'Go Online'}
-          </Text> 
-        </TouchableOpacity>*/}
-      </View> 
-          
-          
-          <View style={styles.header}>
-            <Text style={styles.headerText}>{currentTask?.name}</Text>
-          </View>
+        <View style={styles.greetingBox}>
+          <Text style={styles.headerText}>{currentTask?.name}</Text>
+        </View>
+          <View style={{ height: 30 }} /> 
           <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
          {currentTask?.fields.map((field, index) => (
         <View key={`${field.inputFormTaskFieldID}-${index}`}>
@@ -496,9 +506,14 @@ const TaskDetailScreen = ({ navigation, route }) => {
              onPress={handlePreviousTask}
              disabled={currentTaskIndex === 0}
            >
-             <Text style={[styles.navText, currentTaskIndex === 0 && styles.disabledNavText]}>{'<'}</Text>
+             <View style={styles.navigation}>
+                <Image
+                  source={require('./assets/back-button.png')}
+                  style={[styles.navIcon, currentTaskIndex === 0 && styles.disabledNavText]}
+                />
+              </View>
            </TouchableOpacity>
-         
+           <View style={{ height: 20 }} />
            <TouchableOpacity 
              style={styles.submitButton} 
              onPress={handleSubmitAndGoBack}
@@ -508,37 +523,97 @@ const TaskDetailScreen = ({ navigation, route }) => {
                {submitting ? 'Submitting...' : 'Submit'}
              </Text>
            </TouchableOpacity>
-         
+           <View style={{ height: 20 }} />
            <TouchableOpacity 
              style={[styles.navButton, isLastTask && styles.disabledNavButton]}
              onPress={handleNextTask}
              disabled={isLastTask}
            >
-             <Text style={[styles.navText, isLastTask && styles.disabledNavText]}>{'>'}</Text>
+             
+             <View style={styles.navigation}>
+                <Image
+                  source={require('./assets/next-button.png')}
+                  style={[styles.navIcon, isLastTask && styles.disabledNavIcon]}
+                />
+              </View>
            </TouchableOpacity>
-   
-            
 
          </View>
           )}
           <View style={styles.arrowContainer}>
-          <AntDesign name="arrowdown" size={24} color="#ffcc00" />
+          
           </View>
         </Animated.View>
-      </PanGestureHandler>
+      
     </GestureHandlerRootView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-
-  arrowContainer: {
-    position: 'absolute',
-    top: 10,
+    backgroundColor: 'black',
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 0,
+    },
+    navigation: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    backButton: {
+     left: 20, // Adjust this to position the button horizontally
+      zIndex: 1, // Ensure the button is above other elements
+    },
+    backButtonImage: {
+      width: 67, // Adjust width as needed
+      height: 67, // Adjust height as needed
+    },
+    greetingBox: {
+      backgroundColor: '#CAC3C3',
+      padding: 20,
+      borderRadius: 10,
+      marginBottom: 20,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    greeting: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 10,
+    },
+    navIcon: {
+      width: 100,  // Adjust width as needed
+      height: 100, // Adjust height as needed
+    },
+    disabledNavIcon: {
+      opacity: 0.5, // Disabled style for the image
+    },
+    radioOptionContainer: {
+      flexDirection: 'row', // Align radio button and label horizontally
+      alignItems: 'center', // Center align items vertically
+      marginBottom: 10,
+      paddingLeft: '1%',
+    },
+    radioCircle: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#ffcc00',
+    borderRadius: 15,
+    backgroundColor: 'transparent'
+    },
+    radioCircleSelected: {
+      backgroundColor: '#ffcc00', // Change to desired selected color
+    },
+    radioLabel: {
+      fontSize: 24,
+      alignSelf: 'center',
+      color: 'white',
+      paddingLeft:'8%'
+    },
+    arrowContainer: {
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -551,21 +626,21 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 120,
     backgroundColor: "#CAC3C3",
-    marginBottom: 20,
-    marginTop: 50,
+    marginBottom: 0,
+    marginTop: 10,
    
   },
   headerText: {
     fontStyle: "normal",
     fontWeight: "bold",
-    fontSize: 30,
+    fontSize: 50,
     color: "#000",
   },
   subHeaderText: {
     textAlign: "center",
     fontStyle: "normal",
     fontWeight: "bold",
-    fontSize: 20,
+    fontSize: 50,
     marginTop: 10,
     color: "#000",
   },
@@ -667,14 +742,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffcc00",
     justifyContent: "center",
     alignItems: "center",
-    padding: 10,
+    padding: 5,
     borderRadius: 5,
-    flex: 1,
     marginHorizontal: 10,
+    width: '50%' ,
   },
   submitButtonText: {
     color: "#000",
-    fontSize: 16,
+    fontSize: 50,
     fontWeight: "bold",
   },
   errorText: {
@@ -682,7 +757,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
   },
-
   cameraButton: {
     backgroundColor: '#ffcc00',
     padding: 5,
@@ -723,7 +797,7 @@ const styles = StyleSheet.create({
   },
   labelText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 24,
     marginRight: 10
   },
   imageCapturedText: {

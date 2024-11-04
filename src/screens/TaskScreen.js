@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   FlatList,
   ScrollView,
-  Image,
+  Image,StatusBar 
 } from "react-native";
 import axios from "axios";
 import {AsyncStorage} from 'react-native';
@@ -16,13 +16,13 @@ const AssignmentTypeIcon = ({ type }) => {
   let iconSource;
   switch (type) {
     case 0: // Checklist
-      iconSource = require("./assets/checklist.jpg");
+      iconSource = require("./assets/checklisticon.png");
       break;
     case 1: // Instructions
-      iconSource = require("./assets/instructions.png");
+      iconSource = require("./assets/instructionicon.png");
       break;
     case 2: // Alert
-      iconSource = require("./assets/alert.png");
+      iconSource = require("./assets/alerticon.png");
       break;
     case 3: // Ticket
       iconSource = require("./assets/ticket.png");
@@ -72,14 +72,12 @@ const TaskScreen = ({ navigation }) => {
     setLoading(true);
     try {
       let fetchedAssignments;
-
+      
       if (isOnline) {
         const response = await axios.get(
           "https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1"
         );
-
         
-
         fetchedAssignments = response.data.map((assignment) => ({
           id: assignment.assignmentId.toString(),
           name: assignment.name,
@@ -106,7 +104,6 @@ const TaskScreen = ({ navigation }) => {
           throw new Error("No stored assignments available");
         }
       }
-
       setAssignments(fetchedAssignments);
       setError(null);
     } catch (error) {
@@ -118,6 +115,7 @@ const TaskScreen = ({ navigation }) => {
   }, [isOnline]);
 
   React.useEffect(() => {
+  
     fetchAssignments();
   }, [fetchAssignments, isOnline]);
 
@@ -166,7 +164,8 @@ const TaskScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#ffcc00" />
+        <ActivityIndicator size="large" color="black" />
+        <Text style={styles.loadingText}>It is going to be a busy day</Text>
       </View>
     );
   }
@@ -184,22 +183,18 @@ const TaskScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+       <StatusBar hidden={true} />
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Image
+          source={require('./assets/left-arrow.png')} // Ensure this path is correct
+          style={styles.backButtonImage}
+        />
+      </TouchableOpacity>
       <View style={styles.headerContainer}>
         <View style={styles.greetingBox}>
           <Text style={styles.greeting}>Hi Terry!</Text>
           <Text style={styles.queueText}>Pending Assignments are:</Text>
         </View>
-        {/*<TouchableOpacity
-          style={[
-            styles.toggleButton,
-            { backgroundColor: isOnline ? "#4CAF50" : "#F44336" },
-          ]}
-          onPress={toggleConnection}
-        >
-         } <Text style={styles.toggleButtonText}>
-            {isOnline ? "Go Offline" : "Go Online"}
-          </Text>
-        </TouchableOpacity>*/}
       </View>
       <FlatList
         style={styles.assignmentsWrapper}
@@ -215,7 +210,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
-    padding: 20,
+  },
+  backButton: {top: 0, // Adjust this to position the button vertically
+    left: 20, // Adjust this to position the button horizontally
+    zIndex: 1, // Ensure the button is above other elements
+  },
+  backButtonImage: {
+    width: 67, // Adjust width as needed
+    height: 67, // Adjust height as needed
   },
   greetingBox: {
     backgroundColor: "#CAC3C3",
@@ -224,6 +226,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     alignItems: "center",
     width: "100%"
+  },
+  loadingText: {
+    color: "white",
+    fontSize: 16,
+    textAlign: "center",
+    marginTop: 10,
   },
   greeting: {
     fontSize: 24,
@@ -255,7 +263,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   assignmentName: {
-    fontSize: 18,
+    fontSize: 24,
     color: "white",
     marginLeft: 10,
   },

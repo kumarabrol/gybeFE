@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Text, StyleSheet, View, TouchableOpacity, FlatList, Animated } from 'react-native';
+import { Text, StyleSheet, View, TouchableOpacity, FlatList, Animated,Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -161,6 +161,7 @@ const DetailScreen = ({ navigation, route }) => {
         ]}
         onPress={() => handleStartPress(item.id)}
       >
+        <View style={styles.textWithCheckmark}>
         <Text style={[
           styles.taskName,
           hasResponse && styles.taskWithResponseText,
@@ -169,22 +170,23 @@ const DetailScreen = ({ navigation, route }) => {
         ]}>
           {item.name}
         </Text>
+        {hasResponse && (
+          <Icon name="checkmark" size={50} color="black" style={styles.checkmarkIcon} />
+        )}
+        </View>
       </TouchableOpacity>
     );
   };
 
   return (
+    <View style={styles.container}>
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PanGestureHandler
-        onGestureEvent={handleGesture}
-        onHandlerStateChange={handleStateChange}
-      >
-        <Animated.View style={[styles.container, { transform: [{ translateY: pan.y }] }]}>
-          <View style={styles.arrowContainer}>
-            <Animated.View style={{ opacity: arrowOpacity }}>
-              <Icon name="arrow-down" size={24} color="#ffcc00" />
-            </Animated.View>
-          </View>
+    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Image
+          source={require('./assets/left-arrow.png')} // Ensure this path is correct
+          style={styles.backButtonImage}
+        />
+      </TouchableOpacity>
           <View style={styles.greetingBox}>
             <Text style={styles.greeting}>{assignmentName}</Text>
             <Text style={styles.queueText}>Please complete following tasks:</Text>
@@ -199,18 +201,18 @@ const DetailScreen = ({ navigation, route }) => {
               keyExtractor={item => item.id}
             />
           )}
-        </Animated.View>
-      </PanGestureHandler>
+       
     </GestureHandlerRootView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000',
-    padding: 20,
-  },
+    backgroundColor: 'black',
+      flex: 1,
+      padding: 0,
+    },
   arrowContainer: {
     position: 'absolute',
     top: 20,
@@ -219,18 +221,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1,
   },
+  backButton: {
+    top: 0, // Adjust this to position the button vertically
+    left: 20, // Adjust this to position the button horizontally
+    zIndex: 1, // Ensure the button is above other elements
+  },
+  backButtonImage: {
+    width: 67, // Adjust width as needed
+    height: 67, // Adjust height as needed
+  },
   greetingBox: {
     backgroundColor: '#CAC3C3',
     padding: 20,
     borderRadius: 10,
     marginBottom: 20,
     alignItems: 'center',
-    marginTop: 50,
+    marginTop: 10,
   },
   greeting: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
+  },
+  textWithCheckmark: {
+    flexDirection: 'row', // Aligns text and icon horizontally
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 5,
+  },
+  checkmarkIcon: {
+   // marginLeft: 5, // Pushes the checkmark to the far right
   },
   queueText: {
     fontSize: 18,
@@ -240,16 +262,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   taskItem: {
-    backgroundColor: '#1c1c1c',
+    backgroundColor: '#FFD700',
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
   },
   taskWithResponse: {
-    backgroundColor: 'green',
+    backgroundColor: '#FFD700',
+    padding: 25,
+    borderRadius: 8,
+    marginBottom: 10,
   },
   taskWithoutResponse: {
-    backgroundColor: 'yellow',
+    backgroundColor: 'gold',
+    padding: 35,
+    borderRadius: 8,
+    marginBottom: 10,
+
   },
   selectedTaskItem: {
     backgroundColor: '#333',
@@ -257,13 +286,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   taskName: {
-    fontSize: 16,
-    color: 'white',
+    fontSize: 24,
+    color: 'black',
   },
   taskWithResponseText: {
-    color: 'white',
+    fontSize: 24,
+    color: 'black',
   },
   taskWithoutResponseText: {
+    fontSize: 24,
     color: 'black',
   },
   completedTaskItem: {
