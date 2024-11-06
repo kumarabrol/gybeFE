@@ -81,6 +81,7 @@ const handleSignIn = async () => {
         ).then((res) => {
           console.log('Access token: ', res.accessToken);
           setToken(res.accessToken);
+          console.log('Token:', token);
           navigation.navigate('Assignments'); // Navigate to the next screen
         }).catch((error) => {
           console.error('Failed to exchange code:', error);
@@ -90,6 +91,12 @@ const handleSignIn = async () => {
       console.error('Failed to prompt:', error);
     });
   };
+
+  const handleSignOut = () => {
+    setToken(null);
+    // TODO: Add return url to switch back to app
+    discovery?.endSessionEndpoint && WebBrowser.openBrowserAsync(discovery.endSessionEndpoint);
+  }
 
   return (
     <View style={styles.container}>
@@ -109,6 +116,9 @@ const handleSignIn = async () => {
           />
        */}
       <Button title="Sign In" onPress={handleSignIn} disabled={!request} />
+      {/* new line */}
+      <Text>&nbsp;</Text>
+      <Button title='Sign Out' onPress={handleSignOut} disabled={!token} />
       <Text style={styles.versionText}>App Version: {packageJson.version}</Text>
     </View>
   );

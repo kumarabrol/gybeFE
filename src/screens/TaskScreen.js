@@ -57,7 +57,7 @@ const TaskScreen = ({ navigation, route }) => {
   const fetchAssignments = useCallback(async () => {
     try {
       const response = await axios.get('https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1');
-      console.log('Raw API response:', JSON.stringify(response.data, null, 2));
+      console.log('Raw API response:', JSON.stringify(response.data, null, 2).toString().substring(0, 100), '...');
       
       const fetchedAssignments = response.data.map(assignment => ({
         id: assignment.assignmentId.toString(),
@@ -69,7 +69,7 @@ const TaskScreen = ({ navigation, route }) => {
         name: assignment.name,
       }));
       
-      console.log('Processed assignments:', JSON.stringify(fetchedAssignments, null, 2));
+      console.log('Processed assignments:', JSON.stringify(fetchedAssignments, null, 2).toString().substring(0, 100), '...');
       setAssignments(fetchedAssignments);
       setError(null);
     } catch (error) {
