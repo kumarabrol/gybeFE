@@ -10,6 +10,7 @@ import {
   useAuthRequest,
   useAutoDiscovery,
 } from 'expo-auth-session';
+import { openAuthSessionAsync } from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -93,10 +94,26 @@ const handleSignIn = async () => {
   };
 
   const handleSignOut = () => {
-    setToken(null);
-    // TODO: Add return url to switch back to app
-    discovery?.endSessionEndpoint && WebBrowser.openBrowserAsync(discovery.endSessionEndpoint);
-  }
+    console.log('Signing out...');
+    const params = new URLSearchParams({
+      client_id: clientId,
+      post_logout_redirect_uri: redirectUri,
+    });
+    openAuthSessionAsync(discovery.endSessionEndpoint + '?' + params.toString(), redirectUri)
+      .then((result) => {
+        if (result.type !== 'success') {
+          handleError(new Error('Please, confirm the logout request and wait for it to finish.'));
+          console.error(result);
+          return;
+        }
+      }).then(() => {
+      console.log('Signed out');
+    }).catch((error) => {
+      console.error('Failed to sign out:', error);
+    }).finally(() => {
+      setToken(null);
+    });
+  };
 
   return (
     <View style={styles.container}>
