@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard, Animated, Image , Modal  } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,8 +7,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { AntDesign } from '@expo/vector-icons'; 
 // import NetInfo from '@react-native-community/netinfo';
-//import * as ImagePicker from 'expo-image-picker'; // Add this import
-// import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker'; // Add this import
+ import * as FileSystem from 'expo-file-system';
 import {AsyncStorage} from 'react-native';
 
 const InputFormTaskInputType = {
@@ -34,9 +34,13 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const { assignmentId , detailedData , alltasks, selectedTask} = route.params;
   const [isConnected, setIsConnected] = useState(true);
 
-  
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
-
+  const handleImagePreview = (imageUri) => {
+    setSelectedImage(imageUri);
+    setModalVisible(true);
+  };
   
   const pan = useRef(new Animated.ValueXY()).current;
 
@@ -191,7 +195,8 @@ const TaskDetailScreen = ({ navigation, route }) => {
         }
 
         const base64ImageWithPrefix = `data:image/jpeg;base64,${base64Image}`;
-        //handleInputChange(fieldId, base64ImageWithPrefix);
+        console.log('base64ImageWithPrefix..',base64ImageWithPrefix);
+        handleInputChange(fieldId, base64ImageWithPrefix);
       }
     } catch (error) {
       console.error('Error capturing image:', error);
@@ -454,10 +459,15 @@ const TaskDetailScreen = ({ navigation, route }) => {
                 <MaterialIcons name="camera-alt" size={30} color="#fff" />
               </TouchableOpacity>
               {taskResponses[field.assignmentTaskFieldID]?.value && (
-                <View>
+                 <View style={styles.imageContainer}>
                   <Text style={styles.imageCapturedText}>Image captured</Text>
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>Image Preview</Text>
+                  <View>
+                  <TouchableOpacity onPress={() => handleImagePreview(taskResponses[field.assignmentTaskFieldID].value)}>
+                  <Image
+                    source={{ uri: taskResponses[field.assignmentTaskFieldID].value }}
+                    style={styles.capturedImage}
+                  />
+                  </TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -543,7 +553,18 @@ const TaskDetailScreen = ({ navigation, route }) => {
           <View style={styles.arrowContainer}>
           
           </View>
-        </Animated.View>
+          <Modal
+            visible={modalVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setModalVisible(false)}
+          >
+            <TouchableOpacity style={styles.modalContainer} onPress={() => setModalVisible(false)}>
+              <Image source={{ uri: selectedImage }} style={styles.fullScreenImage} />
+            </TouchableOpacity>
+          </Modal>
+
+     </Animated.View>
       
     </GestureHandlerRootView>
     </View>
@@ -578,10 +599,37 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       marginTop: 10,
     },
+    imageContainer: {
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    capturedImage: {
+      width: 100,
+      height: 100,
+      borderRadius: 10,
+      marginTop: 10,
+    },
     greeting: {
       fontSize: 24,
       fontWeight: 'bold',
       marginBottom: 10,
+    },
+    modalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fullScreenImage: {
+      width: '80%',
+      height: '80%',
+      borderRadius: 10,
+    },
+    imagePreview: {
+      width: 100,
+      height: 100,
+      borderRadius: 5,
+      marginTop: 10,
     },
     navIcon: {
       width: 100,  // Adjust width as needed

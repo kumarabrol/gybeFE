@@ -2,10 +2,52 @@ import React, { useState } from 'react';
 import { TouchableOpacity,Button, View, StyleSheet ,TextInput, Text,Image,Dimensions  } from 'react-native';
 import packageJson from '../../package.json';
 import appJson from '../../app.json';
+import * as WebBrowser from 'expo-web-browser';
+import {
+  exchangeCodeAsync,
+  makeRedirectUri,
+  useAuthRequest,
+  useAutoDiscovery,
+} from 'expo-auth-session';
+
+import { authConfig } from './authConfig';
+
+
+WebBrowser.maybeCompleteAuthSession();
 
 const { width: screenWidth } = Dimensions.get('window');
 const HomeScreen = ({ navigation }) => {
 
+  /* Auth */
+// Endpoint
+const b2cname = 'gybeb2cdev';
+const policyName = 'B2C_1_signupsignin1';
+const scheme = 'rnstarter';
+
+const discovery = useAutoDiscovery(
+  'https://' + b2cname + '.b2clogin.com/' + b2cname + '.onmicrosoft.com/' + policyName + '/v2.0'
+);
+
+const redirectUri = makeRedirectUri({
+  scheme: scheme,
+  path: 'com.devgybecloud.rnstarter/auth',
+});
+console.log('Redirect URI:', redirectUri);
+const clientId = 'edb617eb-dce8-454a-a120-390b9da0096f';
+
+// We store the JWT in here
+const [token, setToken] = useState(null);
+
+// Request
+const [request, , promptAsync] = useAuthRequest(
+  {
+    clientId,
+    scopes: ['openid', 'offline_access', `https://${b2cname}.onmicrosoft.com/api/resources`],
+    redirectUri,
+  },
+  discovery,
+);
+/*
 const [username, setUsername] = useState('');
 const [password, setPassword] = useState('');
 const handleSignIn = async () => {
@@ -14,27 +56,57 @@ const handleSignIn = async () => {
     console.log('Username:', username);
     console.log('Password:', password);
  
-      navigation.navigate('Assignments'); // Navigate to the next screen
+      navigation.navigate('Assignments'); 
     } catch (error) {
       console.error('Sign-in failed:', error);
     }
-  };
+  }; 
+  */
+  const handleSignIn = async () => {
+    console.log('Sign-in button pressed');
+    promptAsync().then((codeResponse) => {
+      if (request && codeResponse?.type === 'success' && discovery) {
+        console.log('Authorization code: ', codeResponse.params.code);
 
+        exchangeCodeAsync(
+          {
+            clientId,
+            code: codeResponse.params.code,
+            extraParams: request.codeVerifier
+              ? { code_verifier: request.codeVerifier }
+              : undefined,
+            redirectUri,
+          },
+          discovery,
+        ).then((res) => {
+          console.log('Access token: ', res.accessToken);
+          setToken(res.accessToken);
+          navigation.navigate('Assignments'); // Navigate to the next screen
+        }).catch((error) => {
+          console.error('Failed to exchange code:', error);
+        });
+      }
+    }).catch((error) => {
+      console.error('Failed to prompt:', error);
+    });
+  };
   return (
     <View style={styles.container}>
       <Image
-        source={require('./assets/safeboatslogo.png')} // Replace with your actual image path
+        source={require('./assets/safeboatslogo.png')} 
         style={styles.image}
       />
-      <TouchableOpacity style={styles.button} onPress={handleSignIn}>
+      <TouchableOpacity style={styles.button} onPress={handleSignIn}  disabled={!request} >
         <Text style={styles.buttonText}>Enter</Text>
       </TouchableOpacity>
-      <Text style={styles.versionText}>App Version: {appJson.expo.version}</Text>
-      <View style={styles.logoContainer}>
-        <Image
-          source={require('./assets/gybelogo.png')} // Replace with the actual path of gybelogo.png
-          style={styles.logo}
-        />
+      <View style={styles.rowContainer}>
+        <Text style={styles.versionText}>App Version: {appJson.expo.version}</Text>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('./assets/gybelogo.png')} 
+            style={styles.logo}
+          />
+        </View>
       </View>
     </View>
   );
@@ -58,9 +130,9 @@ const styles = StyleSheet.create({
       paddingHorizontal: 10,
     },
     image: {
-      width: screenWidth * 1,  // 90% of screen width
-      height: screenWidth * 0.5, // Adjust height proportionally
-      resizeMode: 'contain',     // Ensures the image scales properly
+      width: screenWidth * 1,  
+      height: screenWidth * 0.5, 
+      resizeMode: 'contain',     
       marginBottom: 20,
     },
     greetingBox: {
@@ -77,8 +149,8 @@ const styles = StyleSheet.create({
       },
        button: {
         backgroundColor: '#ffcc00',
-        width: screenWidth * 0.7, // 70% of screen width
-        paddingVertical: 15, // Adjust vertical padding to make the button larger
+        width: screenWidth * 0.7, 
+        paddingVertical: 15, 
         borderRadius: 10,
         alignItems: 'center',
         marginVertical: 20,
@@ -91,22 +163,26 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textTransform: 'uppercase',
       },
-      versionText: {
-        fontSize: 12,
+      rowContainer: {
         position: 'absolute',
-        bottom: 30,       // Distance from the bottom of the screen
-        textAlign: 'center',
+        bottom: 10,
+        width: '100%',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,              
+      },
+      versionText: {                 
+        alignSelf: 'center',
+        fontSize: 12,
+        color: '#333',
         },
         logoContainer: {
-          position: 'absolute',
-          bottom: 20,
-          right: 20,
-          padding: 5, // Adds padding around the logo
-          borderRadius: 10, // Rounded corners; increase for a circular effect
+         
         },
         logo: {
-          width: 50, // Adjust width
-          height: 50, // Adjust height
+          width: 50, 
+          height: 50, 
           resizeMode: 'contain',
         },
 });
