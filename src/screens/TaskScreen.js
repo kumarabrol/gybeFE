@@ -11,6 +11,13 @@ import {
 } from "react-native";
 import axios from "axios";
 import {AsyncStorage} from 'react-native';
+import {
+  exchangeCodeAsync,
+  makeRedirectUri,
+  useAuthRequest,
+  useAutoDiscovery,
+} from 'expo-auth-session';
+import { openAuthSessionAsync } from 'expo-web-browser';
 
 const AssignmentTypeIcon = ({ type }) => {
   let iconSource;
@@ -57,36 +64,50 @@ const AssignmentItem = ({ item, onPress, isSelected, isCompleted }) => (
   </TouchableOpacity>
 );
 
-const TaskScreen = ({ navigation }) => {
+const TaskScreen = ({  route,navigation }) => {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(null);
   const [isOnline, setIsOnline] = useState(true);
-
+  const { employeeId, accessToken, firstName } = route.params;
   const toggleConnection = () => setIsOnline(!isOnline);
+  const b2cname = 'gybeb2cdev';
+  const policyName = 'B2C_1_signupsignin1';
+  const scheme = 'rnstarter';
+  // We store the JWT in here
+const [token, setToken] = useState(null);
 
-  
+  const discovery = useAutoDiscovery(
+    'https://' + b2cname + '.b2clogin.com/' + b2cname + '.onmicrosoft.com/' + policyName + '/v2.0'
+  );
+
+  const redirectUri = makeRedirectUri({
+    scheme: scheme,
+    path: 'com.devgybecloud.rnstarter/auth',
+  });
+  //console.log('Redirect URI:', redirectUri);
+  const clientId = 'edb617eb-dce8-454a-a120-390b9da0096f';
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
     try {
       let fetchedAssignments;
-      
+     // console.log('hello...');
+     // console.log('Employee ID:', employeeId);
       if (isOnline) {
         const response = await axios.get(
-          "https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1"
+          `https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/${employeeId}`,{
+            headers: {
+              Authorization: `Bearer ${accessToken}`
+            }
+          }
         );
         
         fetchedAssignments = response.data.map((assignment) => ({
           id: assignment.assignmentId.toString(),
           name: assignment.name,
           assignmentType: assignment.assignmentType,
-          //status: assignment.assignmentStatus || 0,
-          //startDate: assignment.startTime
-           // ? new Date(assignment.startTime)
-           // : null,
-          //endDate: assignment.endTime ? new Date(assignment.endTime) : null,
           tasks: assignment.tasks[0]?.fields.find(
               (field) => field.fieldLabel === "Instruction:"
             )?.detail ||
@@ -118,6 +139,28 @@ const TaskScreen = ({ navigation }) => {
   
     fetchAssignments();
   }, [fetchAssignments, isOnline]);
+
+  const handleSignOut = async () => {
+    console.log('Signing out...');
+    const params = new URLSearchParams({
+      client_id: clientId,
+      post_logout_redirect_uri: redirectUri,
+    });
+    try {
+      const result = await openAuthSessionAsync(discovery.endSessionEndpoint + '?' + params.toString(), redirectUri);
+      if (result.type !== 'success') {
+        handleError(new Error('Please, confirm the logout request and wait for it to finish.'));
+        console.error(result);
+        return;
+      }
+      console.log('Signed out');
+      navigation.navigate('Gybe'); // Navigate to Home screen
+    } catch (error) {
+      console.error('Failed to sign out:', error);
+    } finally {
+      setToken(null);
+    }
+  };
 
   const handleStartPress = useCallback(
     (assignmentId) => {
@@ -184,15 +227,20 @@ const TaskScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
        <StatusBar hidden={true} />
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Image
-          source={require('./assets/left-arrow.png')} // Ensure this path is correct
-          style={styles.backButtonImage}
-        />
-      </TouchableOpacity>
+       <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Image
+            source={require('./assets/left-arrow.png')} // Ensure this path is correct
+            style={styles.backButtonImage}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+            <Text style={styles.signOutButtonText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       <View style={styles.headerContainer}>
         <View style={styles.greetingBox}>
-          <Text style={styles.greeting}>Hi Terry!</Text>
+          <Text style={styles.greeting}>Hi {firstName}!</Text>
           <Text style={styles.queueText}>Pending Assignments are:</Text>
         </View>
       </View>
@@ -218,6 +266,21 @@ const styles = StyleSheet.create({
   backButtonImage: {
     width: 67, // Adjust width as needed
     height: 67, // Adjust height as needed
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 10,
+    marginTop: 10,
+  },
+  signOutButton: {
+    padding: 10,
+  },
+  signOutButtonText: {
+    color: 'blue',
+    fontSize: 16,
   },
   greetingBox: {
     backgroundColor: "#CAC3C3",

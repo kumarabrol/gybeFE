@@ -3,6 +3,7 @@ import { TouchableOpacity,Button, View, StyleSheet ,TextInput, Text,Image,Dimens
 import packageJson from '../../package.json';
 import appJson from '../../app.json';
 import * as WebBrowser from 'expo-web-browser';
+import { openAuthSessionAsync } from 'expo-web-browser';
 import {
   exchangeCodeAsync,
   makeRedirectUri,
@@ -32,7 +33,7 @@ const redirectUri = makeRedirectUri({
   scheme: scheme,
   path: 'com.devgybecloud.rnstarter/auth',
 });
-console.log('Redirect URI:', redirectUri);
+//console.log('Redirect URI:', redirectUri);
 const clientId = 'edb617eb-dce8-454a-a120-390b9da0096f';
 
 // We store the JWT in here
@@ -47,26 +48,69 @@ const [request, , promptAsync] = useAuthRequest(
   },
   discovery,
 );
-/*
-const [username, setUsername] = useState('');
-const [password, setPassword] = useState('');
-const handleSignIn = async () => {
 
-    try {
-    console.log('Username:', username);
-    console.log('Password:', password);
- 
-      navigation.navigate('Assignments'); 
-    } catch (error) {
-      console.error('Sign-in failed:', error);
+const handleSignOut = () => {
+  console.log('Signing out...');
+  const params = new URLSearchParams({
+    client_id: clientId,
+    post_logout_redirect_uri: redirectUri,
+  });
+  openAuthSessionAsync(discovery.endSessionEndpoint + '?' + params.toString(), redirectUri)
+    .then((result) => {
+      if (result.type !== 'success') {
+        handleError(new Error('Please, confirm the logout request and wait for it to finish.'));
+        console.error(result);
+        return;
+      }
+    }).then(() => {
+    console.log('Signed out');
+  }).catch((error) => {
+    console.error('Failed to sign out:', error);
+  }).finally(() => {
+    setToken(null);
+  });
+};
+
+const decodeJWT = (token) => {
+  const base64Url = token.split('.')[1];
+  let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  
+  // Add padding if necessary
+  switch (base64.length % 4) {
+    case 2:
+      base64 += '==';
+      break;
+    case 3:
+      base64 += '=';
+      break;
+  }
+
+  const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+
+  return JSON.parse(jsonPayload);
+};
+
+const fetchEmployeeDetails = async (oid) => {
+  try {
+    const response = await fetch(`https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Employee/external/${oid}`);
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
     }
-  }; 
-  */
+    const data = await response.json();
+    return { employeeId: data.employeeId, firstName: data.firstName };
+  } catch (error) {
+    console.error('Failed to fetch employee ID:', error);
+    throw error;
+  }
+};
+
   const handleSignIn = async () => {
     console.log('Sign-in button pressed');
     promptAsync().then((codeResponse) => {
       if (request && codeResponse?.type === 'success' && discovery) {
-        console.log('Authorization code: ', codeResponse.params.code);
+        //console.log('Authorization code: ', codeResponse.params.code);
 
         exchangeCodeAsync(
           {
@@ -78,10 +122,22 @@ const handleSignIn = async () => {
             redirectUri,
           },
           discovery,
-        ).then((res) => {
-          console.log('Access token: ', res.accessToken);
+        ).then(async (res) => {
+          //console.log('Access token: ', res.accessToken);
           setToken(res.accessToken);
-          navigation.navigate('Assignments'); // Navigate to the next screen
+          // Decode the access token
+          const decodedToken = decodeJWT(res.accessToken);
+          //console.log('Decoded token:', decodedToken);
+
+          // Fetch and print the oid
+          const oid = decodedToken.oid;
+          //console.log('OID:', oid);
+          const { employeeId, firstName } = await fetchEmployeeDetails(oid);
+          //console.log('Employee ID:', employeeId);
+          //console.log('First Name:', firstName);
+
+          // Pass employeeId, firstName, and accessToken to Assignments screen
+          navigation.navigate('Assignments', { employeeId, firstName, accessToken: res.accessToken });
         }).catch((error) => {
           console.error('Failed to exchange code:', error);
         });

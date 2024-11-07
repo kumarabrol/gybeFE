@@ -10,6 +10,13 @@ import { AntDesign } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker'; // Add this import
  import * as FileSystem from 'expo-file-system';
 import {AsyncStorage} from 'react-native';
+import {
+  exchangeCodeAsync,
+  makeRedirectUri,
+  useAuthRequest,
+  useAutoDiscovery,
+} from 'expo-auth-session';
+import { openAuthSessionAsync } from 'expo-web-browser';
 
 const InputFormTaskInputType = {
   Label: 0,
@@ -36,7 +43,22 @@ const TaskDetailScreen = ({ navigation, route }) => {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const b2cname = 'gybeb2cdev';
+  const policyName = 'B2C_1_signupsignin1';
+  const scheme = 'rnstarter';
+  // We store the JWT in here
+const [token, setToken] = useState(null);
 
+  const discovery = useAutoDiscovery(
+    'https://' + b2cname + '.b2clogin.com/' + b2cname + '.onmicrosoft.com/' + policyName + '/v2.0'
+  );
+
+  const redirectUri = makeRedirectUri({
+    scheme: scheme,
+    path: 'com.devgybecloud.rnstarter/auth',
+  });
+  //console.log('Redirect URI:', redirectUri);
+  const clientId = 'edb617eb-dce8-454a-a120-390b9da0096f';
   const handleImagePreview = (imageUri) => {
     setSelectedImage(imageUri);
     setModalVisible(true);
@@ -59,6 +81,28 @@ const TaskDetailScreen = ({ navigation, route }) => {
       keyboardDidHideListener.remove();
     };
   }, []);
+
+  const handleSignOut = async () => {
+    console.log('Signing out...');
+    const params = new URLSearchParams({
+      client_id: clientId,
+      post_logout_redirect_uri: redirectUri,
+    });
+    try {
+      const result = await openAuthSessionAsync(discovery.endSessionEndpoint + '?' + params.toString(), redirectUri);
+      if (result.type !== 'success') {
+        handleError(new Error('Please, confirm the logout request and wait for it to finish.'));
+        console.error(result);
+        return;
+      }
+      console.log('Signed out');
+      navigation.navigate('Gybe'); // Navigate to Home screen
+    } catch (error) {
+      console.error('Failed to sign out:', error);
+    } finally {
+      setToken(null);
+    }
+  };
 
 
   useFocusEffect(
@@ -166,7 +210,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
     });
   };
   const handleCaptureImage = async (fieldId) => {
-    console.log('Capture image for field:', fieldId);
+   // console.log('Capture image for field:', fieldId);
     
     // Request camera permissions
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -195,7 +239,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
         }
 
         const base64ImageWithPrefix = `data:image/jpeg;base64,${base64Image}`;
-        console.log('base64ImageWithPrefix..',base64ImageWithPrefix);
+       // console.log('base64ImageWithPrefix..',base64ImageWithPrefix);
         handleInputChange(fieldId, base64ImageWithPrefix);
       }
     } catch (error) {
@@ -491,12 +535,18 @@ const TaskDetailScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
     <GestureHandlerRootView style={{ flex: 1 }}>
-    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Image
-          source={require('./assets/left-arrow.png')} // Ensure this path is correct
-          style={styles.backButtonImage}
-        />
-      </TouchableOpacity>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Image
+            source={require('./assets/left-arrow.png')} // Ensure this path is correct
+            style={styles.backButtonImage}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+            <Text style={styles.signOutButtonText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
+
         <Animated.View style={[styles.container, { transform: [{ translateY: pan.y }] }]}>
         <View style={styles.greetingBox}>
           <Text style={styles.headerText}>{currentTask?.name}</Text>
@@ -590,6 +640,21 @@ const styles = StyleSheet.create({
     backButtonImage: {
       width: 67, // Adjust width as needed
       height: 67, // Adjust height as needed
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+      paddingHorizontal: 10,
+      marginTop: 10,
+    },
+    signOutButton: {
+      padding: 10,
+    },
+    signOutButtonText: {
+      color: 'blue',
+      fontSize: 16,
     },
     greetingBox: {
       backgroundColor: '#CAC3C3',

@@ -3,6 +3,13 @@ import { Text, StyleSheet, View, TouchableOpacity, FlatList, Animated,Image } fr
 import { useFocusEffect } from '@react-navigation/native';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {
+  exchangeCodeAsync,
+  makeRedirectUri,
+  useAuthRequest,
+  useAutoDiscovery,
+} from 'expo-auth-session';
+import { openAuthSessionAsync } from 'expo-web-browser';
 
 const DRAG_THRESHOLD = 50;
 
@@ -15,6 +22,23 @@ const DetailScreen = ({ navigation, route }) => {
 
   const pan = useRef(new Animated.ValueXY()).current;
   const arrowOpacity = useRef(new Animated.Value(1)).current;
+  const b2cname = 'gybeb2cdev';
+  const policyName = 'B2C_1_signupsignin1';
+  const scheme = 'rnstarter';
+  // We store the JWT in here
+const [token, setToken] = useState(null);
+
+  const discovery = useAutoDiscovery(
+    'https://' + b2cname + '.b2clogin.com/' + b2cname + '.onmicrosoft.com/' + policyName + '/v2.0'
+  );
+
+  const redirectUri = makeRedirectUri({
+    scheme: scheme,
+    path: 'com.devgybecloud.rnstarter/auth',
+  });
+  //console.log('Redirect URI:', redirectUri);
+  const clientId = 'edb617eb-dce8-454a-a120-390b9da0096f';
+
 
   useEffect(() => {
     // Log the entire route.params to debug
@@ -81,6 +105,28 @@ const DetailScreen = ({ navigation, route }) => {
       }
     }, [route.params?.completedTaskId])
   );
+
+  const handleSignOut = async () => {
+    console.log('Signing out...');
+    const params = new URLSearchParams({
+      client_id: clientId,
+      post_logout_redirect_uri: redirectUri,
+    });
+    try {
+      const result = await openAuthSessionAsync(discovery.endSessionEndpoint + '?' + params.toString(), redirectUri);
+      if (result.type !== 'success') {
+        handleError(new Error('Please, confirm the logout request and wait for it to finish.'));
+        console.error(result);
+        return;
+      }
+      console.log('Signed out');
+      navigation.navigate('Gybe'); // Navigate to Home screen
+    } catch (error) {
+      console.error('Failed to sign out:', error);
+    } finally {
+      setToken(null);
+    }
+  };
 
   const handleStartPress = (taskId) => {
     const selectedTask = tasks.find(task => task.id === taskId);
@@ -181,12 +227,17 @@ const DetailScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
     <GestureHandlerRootView style={{ flex: 1 }}>
-    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Image
-          source={require('./assets/left-arrow.png')} // Ensure this path is correct
-          style={styles.backButtonImage}
-        />
-      </TouchableOpacity>
+        <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Image
+                source={require('./assets/left-arrow.png')} // Ensure this path is correct
+                style={styles.backButtonImage}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+                <Text style={styles.signOutButtonText}>Sign Out</Text>
+              </TouchableOpacity>
+        </View>
           <View style={styles.greetingBox}>
             <Text style={styles.greeting}>{assignmentName}</Text>
             <Text style={styles.queueText}>Please complete following tasks:</Text>
@@ -229,6 +280,21 @@ const styles = StyleSheet.create({
   backButtonImage: {
     width: 67, // Adjust width as needed
     height: 67, // Adjust height as needed
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 10,
+    marginTop: 10,
+  },
+  signOutButton: {
+    padding: 10,
+  },
+  signOutButtonText: {
+    color: 'blue',
+    fontSize: 16,
   },
   greetingBox: {
     backgroundColor: '#CAC3C3',
