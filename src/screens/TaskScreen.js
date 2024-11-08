@@ -7,10 +7,14 @@ import {
   ActivityIndicator,
   FlatList,
   ScrollView,
-  Image,StatusBar 
+  Image,
+  StatusBar 
 } from "react-native";
 import axios from "axios";
-import {AsyncStorage} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const STORAGE_KEY = '@assignments_cache';
+const LAST_UPDATED_KEY = '@assignments_last_updated';
 
 const AssignmentTypeIcon = ({ type }) => {
   let iconSource;
@@ -63,59 +67,89 @@ const TaskScreen = ({ navigation }) => {
   const [error, setError] = useState(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(null);
   const [isOnline, setIsOnline] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const toggleConnection = () => setIsOnline(!isOnline);
 
-  
+  const storeData = async (data) => {
+    try {
+      const jsonValue = JSON.stringify(data);
+      await AsyncStorage.setItem(STORAGE_KEY, jsonValue);
+      const timestamp = new Date().toISOString();
+      await AsyncStorage.setItem(LAST_UPDATED_KEY, timestamp);
+      setLastUpdated(timestamp);
+    } catch (e) {
+      console.error('Error saving data:', e);
+    }
+  };
+
+  const getStoredData = async () => {
+    try {
+      const jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
+      const timestamp = await AsyncStorage.getItem(LAST_UPDATED_KEY);
+      setLastUpdated(timestamp);
+      return jsonValue != null ? JSON.parse(jsonValue) : null;
+    } catch (e) {
+      console.error('Error reading data:', e);
+      return null;
+    }
+  };
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
     try {
-      let fetchedAssignments;
-      
       if (isOnline) {
+        // Try to fetch from API
         const response = await axios.get(
           "https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1"
         );
         
-        fetchedAssignments = response.data.map((assignment) => ({
+        const fetchedAssignments = response.data.map((assignment) => ({
           id: assignment.assignmentId.toString(),
           name: assignment.name,
           assignmentType: assignment.assignmentType,
-          //status: assignment.assignmentStatus || 0,
-          //startDate: assignment.startTime
-           // ? new Date(assignment.startTime)
-           // : null,
-          //endDate: assignment.endTime ? new Date(assignment.endTime) : null,
           tasks: assignment.tasks[0]?.fields.find(
-              (field) => field.fieldLabel === "Instruction:"
-            )?.detail ||
-            assignment.tasks[0]?.fields.find(
-              (field) => field.fieldLabel === "Description:"
-            )?.detail ||
-            "No instructions available",
+            (field) => field.fieldLabel === "Instruction:"
+          )?.detail ||
+          assignment.tasks[0]?.fields.find(
+            (field) => field.fieldLabel === "Description:"
+          )?.detail ||
+          "No instructions available",
           tasks: assignment.tasks,
         }));
 
-       
+        // Store the fetched data
+        await storeData(fetchedAssignments);
+        setAssignments(fetchedAssignments);
       } else {
-        fetchedAssignments = await getDataFromStorage("assignments");
-        if (!fetchedAssignments) {
-          throw new Error("No stored assignments available");
+        // Try to load from storage when offline
+        const storedAssignments = await getStoredData();
+        if (!storedAssignments) {
+          throw new Error("No stored assignments available. Please connect to the internet to fetch assignments.");
         }
+        setAssignments(storedAssignments);
       }
-      setAssignments(fetchedAssignments);
       setError(null);
     } catch (error) {
       console.error("Error fetching assignments:", error.stack);
-      setError(error.message);
+      // If online fetch fails, try to fall back to stored data
+      if (isOnline) {
+        const storedAssignments = await getStoredData();
+        if (storedAssignments) {
+          setAssignments(storedAssignments);
+          setError("Could not fetch new assignments. Showing cached data.");
+        } else {
+          setError("Could not fetch assignments. Please check your internet connection.");
+        }
+      } else {
+        setError(error.message);
+      }
     } finally {
       setLoading(false);
     }
   }, [isOnline]);
 
   React.useEffect(() => {
-  
     fetchAssignments();
   }, [fetchAssignments, isOnline]);
 
@@ -127,18 +161,13 @@ const TaskScreen = ({ navigation }) => {
   
       if (selectedAssignment) {
         setSelectedAssignmentId(assignmentId);
-        console.log(`assignmentId: ${assignmentId}`);
-        console.log(selectedAssignment.tasks.length);
-        // Check if the assignment has only one task
         if (selectedAssignment.tasks.length === 1) {
-          // Navigate directly to TaskDetail screen
           navigation.navigate("Task-Details", {
             assignmentId: assignmentId,
             detailedData: selectedAssignment,
             alltasks: selectedAssignment.tasks
           });
         } else {
-          // Navigate to Task screen for multiple tasks
           navigation.navigate("Task", {
             assignmentId: assignmentId,
             name: selectedAssignment.name,
@@ -170,23 +199,12 @@ const TaskScreen = ({ navigation }) => {
     );
   }
 
-  if (error) {
-    return (
-      <ScrollView style={styles.container}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchAssignments}>
-          <Text style={styles.buttonText}>Retry</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    );
-  }
-
   return (
     <View style={styles.container}>
-       <StatusBar hidden={true} />
+      <StatusBar hidden={true} />
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Image
-          source={require('./assets/left-arrow.png')} // Ensure this path is correct
+          source={require('./assets/left-arrow.png')}
           style={styles.backButtonImage}
         />
       </TouchableOpacity>
@@ -194,6 +212,12 @@ const TaskScreen = ({ navigation }) => {
         <View style={styles.greetingBox}>
           <Text style={styles.greeting}>Hi Terry!</Text>
           <Text style={styles.queueText}>Pending Assignments are:</Text>
+          {lastUpdated && (
+            <Text style={styles.lastUpdated}>
+              Last updated: {new Date(lastUpdated).toLocaleString()}
+            </Text>
+          )}
+          {error && <Text style={styles.errorBanner}>{error}</Text>}
         </View>
       </View>
       <FlatList
@@ -202,10 +226,20 @@ const TaskScreen = ({ navigation }) => {
         renderItem={renderAssignment}
         keyExtractor={(item) => item.id}
       />
+      <TouchableOpacity 
+        style={[
+          styles.connectionToggle,
+          { backgroundColor: isOnline ? '#4CAF50' : '#F44336' }
+        ]}
+        onPress={toggleConnection}
+      >
+        <Text style={styles.connectionToggleText}>
+          {isOnline ? 'Online' : 'Offline'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -309,6 +343,29 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+  lastUpdated: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+  },
+  errorBanner: {
+    color: '#F44336',
+    fontSize: 14,
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  connectionToggle: {
+    position: 'absolute',
+    right: 20,
+    top: 20,
+    padding: 8,
+    borderRadius: 20,
+    zIndex: 1,
+  },
+  connectionToggleText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

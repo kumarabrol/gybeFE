@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard, Animated, Image , Modal  } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard, Animated, Image, Modal, Switch } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
-import { AntDesign } from '@expo/vector-icons'; 
-// import NetInfo from '@react-native-community/netinfo';
-import * as ImagePicker from 'expo-image-picker'; // Add this import
- import * as FileSystem from 'expo-file-system';
-import {AsyncStorage} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+
+// Storage keys
+const RESPONSES_STORAGE_KEY = '@task_responses';
+const CONNECTION_STATE_KEY = '@connection_state';
 
 const InputFormTaskInputType = {
   Label: 0,
@@ -18,11 +20,30 @@ const InputFormTaskInputType = {
   CheckBox: 3,
   Button: 4,
   PF: 5,
-  CaptureImage: 6, 
+  CaptureImage: 6,
 };
 
 const { width, height } = Dimensions.get('window');
 const DRAG_THRESHOLD = 100;
+
+const AssignmentTypeIcon = ({ type }) => {
+  let iconSource;
+  switch (type) {
+    case 0: // Checklist
+      iconSource = require("./assets/checklisticon.png");
+      break;
+    case 1: // Instructions
+      iconSource = require("./assets/instructionicon.png");
+      break;
+    case 2: // Alert
+      iconSource = require("./assets/alerticon.png");
+      break;
+    case 3: // Ticket
+      iconSource = require("./assets/ticket.png");
+      break;
+  }
+  return <Image source={iconSource} style={styles.assignmentIcon} />;
+};
 
 const TaskDetailScreen = ({ navigation, route }) => {
   const [tasks, setTasks] = useState([]);
@@ -31,19 +52,16 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const { assignmentId , detailedData , alltasks, selectedTask} = route.params;
-  const [isConnected, setIsConnected] = useState(true);
-
+  const [isOnline, setIsOnline] = useState(true);
+  const [showConnectionPanel, setShowConnectionPanel] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-
-  const handleImagePreview = (imageUri) => {
-    setSelectedImage(imageUri);
-    setModalVisible(true);
-  };
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const { assignmentId, detailedData, alltasks, selectedTask } = route.params;
   
   const pan = useRef(new Animated.ValueXY()).current;
 
+  // Keyboard event listeners
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
@@ -60,44 +78,64 @@ const TaskDetailScreen = ({ navigation, route }) => {
     };
   }, []);
 
+  // Load saved connection state and responses
+  useEffect(() => {
+    const loadSavedState = async () => {
+      try {
+        const [savedConnectionState, savedResponses, savedTimestamp] = await Promise.all([
+          AsyncStorage.getItem(CONNECTION_STATE_KEY),
+          AsyncStorage.getItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}`),
+          AsyncStorage.getItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}_timestamp`)
+        ]);
 
+        if (savedConnectionState !== null) {
+          setIsOnline(JSON.parse(savedConnectionState));
+        }
+
+        if (savedResponses !== null) {
+          setTaskResponses(JSON.parse(savedResponses));
+        }
+
+        if (savedTimestamp !== null) {
+          setLastUpdated(savedTimestamp);
+        }
+      } catch (error) {
+        console.error('Error loading saved state:', error);
+      }
+    };
+
+    loadSavedState();
+  }, [assignmentId]);
+
+  // Initialize tasks and responses
   useFocusEffect(
     React.useCallback(() => {
       if (alltasks) {
         setTasks(alltasks);
-        //console.log('all tasks:', JSON.stringify(alltasks, null, 2));
-  
-        // Initialize responses with proper structure
         const initialResponses = {};
         alltasks.forEach(task => {
           task.fields.forEach(field => {
             initialResponses[field.assignmentTaskFieldID] = {
-              value: field.response || '',  
+              value: field.response || '',
               status: false
             };
           });
         });
-  
-        //console.log('Initializing taskResponses:', initialResponses);
-        //console.log('Initializing alltasks:', alltasks);
+
         let baseSelTask;
-        if(selectedTask === undefined){
-          baseSelTask=alltasks[0].assignmentTaskID
-          //selectedTask = alltasks[0];
-        }
-        else{
-          baseSelTask=selectedTask.id;
+        if (selectedTask === undefined) {
+          baseSelTask = alltasks[0].assignmentTaskID;
+        } else {
+          baseSelTask = selectedTask.id;
         }
 
-        //console.log('selectedTask :', JSON.stringify(selectedTask, null, 2));
-        setTaskResponses(initialResponses);
-      //  console.log('Initializing alltasks:', alltasks);
-  
-        // Find the index of the selected task
+        setTaskResponses(prevResponses => ({
+          ...prevResponses,
+          ...initialResponses
+        }));
+
         const selectedTaskIndex = alltasks.findIndex(task => task.id === baseSelTask);
-       // console.log('Initializing taskResponses:', initialResponses);
         setCurrentTaskIndex(selectedTaskIndex !== -1 ? selectedTaskIndex : 0);
-  
         setLoading(false);
       } else {
         console.error('No detailed data provided in route params');
@@ -107,14 +145,60 @@ const TaskDetailScreen = ({ navigation, route }) => {
     }, [alltasks, selectedTask])
   );
 
+  // Save responses when they change
+  useEffect(() => {
+    const saveResponses = async () => {
+      try {
+        const timestamp = new Date().toISOString();
+        await Promise.all([
+          AsyncStorage.setItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}`, JSON.stringify(taskResponses)),
+          AsyncStorage.setItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}_timestamp`, timestamp)
+        ]);
+        setLastUpdated(timestamp);
+      } catch (error) {
+        console.error('Error saving responses:', error);
+      }
+    };
+
+    if (Object.keys(taskResponses).length > 0) {
+      saveResponses();
+    }
+  }, [taskResponses, assignmentId]);
+
+  const toggleConnection = async () => {
+    const newState = !isOnline;
+    setIsOnline(newState);
+    try {
+      await AsyncStorage.setItem(CONNECTION_STATE_KEY, JSON.stringify(newState));
+    } catch (error) {
+      console.error('Error saving connection state:', error);
+    }
+  };
+
+  const toggleConnectionPanel = () => {
+    setShowConnectionPanel(!showConnectionPanel);
+  };
+
+  const clearStoredResponses = async () => {
+    try {
+      await AsyncStorage.multiRemove([
+        `${RESPONSES_STORAGE_KEY}_${assignmentId}`,
+        `${RESPONSES_STORAGE_KEY}_${assignmentId}_timestamp`
+      ]);
+      setTaskResponses({});
+      setLastUpdated(null);
+      Alert.alert('Success', 'Stored responses cleared successfully');
+    } catch (error) {
+      console.error('Error clearing responses:', error);
+      Alert.alert('Error', 'Failed to clear stored responses');
+    }
+  };
+
   const handleGesture = Animated.event(
     [{ nativeEvent: { translationY: pan.y } }],
     { useNativeDriver: false }
   );
-  
-  const toggleConnection = () => {
-    setIsConnected(!isConnected);
-  };
+
   const handleStateChange = ({ nativeEvent }) => {
     if (nativeEvent.oldState === State.ACTIVE) {
       if (nativeEvent.translationY > DRAG_THRESHOLD) {
@@ -132,8 +216,8 @@ const TaskDetailScreen = ({ navigation, route }) => {
               },
               style: "cancel"
             },
-            { 
-              text: "Yes", 
+            {
+              text: "Yes",
               onPress: handleSubmitAndGoBack
             }
           ],
@@ -147,6 +231,8 @@ const TaskDetailScreen = ({ navigation, route }) => {
       }
     }
   };
+
+
 
   const handleInputChange = (fieldId, value) => {
     // console.log('HandleInputChange called with:', { fieldId, value });
@@ -216,13 +302,22 @@ const TaskDetailScreen = ({ navigation, route }) => {
   };
 
   const handleSubmitAndGoBack = async () => {
+    if (!isOnline) {
+      Alert.alert(
+        'Offline Mode',
+        'Your responses will be saved locally and submitted when youre back online.',
+        [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
-      //console.log('tasks...205...',tasks)
       const formattedTasks = tasks.map(task => ({
-        //inputFormTaskID: task.inputFormTaskID,
         taskSequence: task.taskSequence,
-        assignmentTaskID: task.id?? task.assignmentTaskID,
+        assignmentTaskID: task.id ?? task.assignmentTaskID,
         name: task.name,
         startTime: task.startTime,
         userClickedSave: task.userClickedSave,
@@ -233,20 +328,15 @@ const TaskDetailScreen = ({ navigation, route }) => {
           fieldLabel: field.fieldLabel,
           inputFormTaskInputType: field.inputFormTaskInputType,
           detail: field.detail,
-          response: taskResponses[field.assignmentTaskFieldID]?.value.toString()
+          response: taskResponses[field.assignmentTaskFieldID]?.value?.toString() || ''
         }))
       }));
-
-      const { assignmentId, instructions } = route.params
-      console.log('assignmentId...168...',assignmentId)
 
       const payload = {
         assignmentId: assignmentId,
         deviceId: -1,
         tasks: formattedTasks
       };
-
-      //console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       const response = await axios.put(
         'https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/RecordAssignmentWork',
@@ -259,30 +349,23 @@ const TaskDetailScreen = ({ navigation, route }) => {
         }
       );
 
-      //console.log('Submit response:', response.data);
+      await AsyncStorage.multiRemove([
+        `${RESPONSES_STORAGE_KEY}_${assignmentId}`,
+        `${RESPONSES_STORAGE_KEY}_${assignmentId}_timestamp`
+      ]);
+
       Alert.alert('Success', 'Responses submitted successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
       console.error('Error submitting responses:', error);
       
-      let errorMessage = 'Failed to submit responses. Please try again.';
+      let errorMessage = 'Failed to submit responses. Your responses are saved locally.';
       if (error.response) {
-        console.error('Error data:', error.response.data);
-        console.error('Error status:', error.response.status);
-        console.error('Error headers:', error.response.headers);
-        
-        if (error.response.status === 500) {
-          errorMessage = 'The server encountered an internal error. Please try again later or contact support.';
-          console.error('Server error details:', error.response.data);
-        } else {
-          errorMessage = `Server error (${error.response.status}): ${JSON.stringify(error.response.data)}`;
-        }
+        errorMessage = `Server error (${error.response.status}): ${JSON.stringify(error.response.data)}`;
       } else if (error.request) {
-        console.error('Error request:', error.request);
         errorMessage = 'No response received from server. Please check your internet connection.';
       } else {
-        console.error('Error message:', error.message);
         errorMessage = `Error: ${error.message}`;
       }
       
@@ -488,6 +571,39 @@ const TaskDetailScreen = ({ navigation, route }) => {
 
   const isLastTask = currentTaskIndex === tasks.length - 1;
 
+
+
+  const ConnectionPanel = () => (
+    <View style={styles.connectionPanel}>
+      <View style={styles.connectionHeader}>
+        <Text style={styles.connectionTitle}>Connection Settings</Text>
+        <TouchableOpacity onPress={toggleConnectionPanel}>
+          <Text style={styles.closeButton}>×</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.connectionContent}>
+        <View style={styles.connectionRow}>
+          <Text style={styles.connectionLabel}>Online Mode</Text>
+          <Switch
+            value={isOnline}
+            onValueChange={toggleConnection}
+            trackColor={{ false: "#767577", true: "#81b0ff" }}
+            thumbColor={isOnline ? "#f5dd4b" : "#f4f3f4"}
+          />
+        </View>
+        <Text style={styles.connectionStatus}>
+          Status: {isOnline ? 'Online' : 'Offline'}
+        </Text>
+        <TouchableOpacity 
+          style={styles.clearCacheButton}
+          onPress={clearStoredResponses}
+        >
+          <Text style={styles.clearCacheText}>Clear Stored Responses</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -497,6 +613,20 @@ const TaskDetailScreen = ({ navigation, route }) => {
           style={styles.backButtonImage}
         />
       </TouchableOpacity>
+
+      <TouchableOpacity 
+          style={styles.connectionToggleButton}
+          onPress={toggleConnectionPanel}
+        >
+          <View style={[styles.connectionIndicator, 
+            { backgroundColor: isOnline ? '#4CAF50' : '#F44336' }]} />
+          <Text style={styles.connectionToggleText}>
+            {isOnline ? 'Online' : 'Offline'}
+          </Text>
+        </TouchableOpacity>
+
+        {showConnectionPanel && <ConnectionPanel />}
+
         <Animated.View style={[styles.container, { transform: [{ translateY: pan.y }] }]}>
         <View style={styles.greetingBox}>
           <Text style={styles.headerText}>{currentTask?.name}</Text>
@@ -893,7 +1023,83 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     // paddingHorizontal: 20
-  }
+  },
+
+  connectionPanel: {
+    position: 'absolute',
+    top: '10%',
+    left: '10%',
+    right: '10%',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 10,
+    padding: 15,
+    zIndex: 2,
+    elevation: 5,
+  },
+  connectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  connectionTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  connectionContent: {
+    gap: 15,
+  },
+  connectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  connectionLabel: {
+    color: 'white',
+    fontSize: 16,
+  },
+  connectionStatus: {
+    color: '#aaa',
+    fontSize: 14,
+  },
+  clearCacheButton: {
+    backgroundColor: '#FF5252',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  clearCacheText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  connectionToggleButton: {
+    position: 'absolute',
+    right: 20,
+    top: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    padding: 8,
+    borderRadius: 20,
+    zIndex: 1,
+  },
+  connectionIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 5,
+  },
+  connectionToggleText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
 
 });
 
