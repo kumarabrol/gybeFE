@@ -101,7 +101,7 @@ const TaskScreen = ({ navigation }) => {
       if (isOnline) {
         // Try to fetch from API
         const response = await axios.get(
-          "https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/1"
+          "https://gbapidev.yellowmushroom-4d501d6c.westus.azurecontainerapps.io/api/Assignment/Assignments/9"
         );
         
         const fetchedAssignments = response.data.map((assignment) => ({

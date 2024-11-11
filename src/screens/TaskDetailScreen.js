@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Alert, Dimensions, Keyboard, Animated, Image, Modal, Switch } from 'react-native';
-import axios from 'axios';
+import axios, { all } from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -57,11 +57,112 @@ const TaskDetailScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
   const { assignmentId, detailedData, alltasks, selectedTask } = route.params;
-  
   const pan = useRef(new Animated.ValueXY()).current;
 
-  // Keyboard event listeners
+  // First, load saved responses from AsyncStorage
+  useEffect(() => {
+    const loadSavedState = async () => {
+      try {
+        const [savedConnectionState, savedResponses, savedTimestamp] = await Promise.all([
+          AsyncStorage.getItem(CONNECTION_STATE_KEY),
+          AsyncStorage.getItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}`),
+          AsyncStorage.getItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}_timestamp`)
+        ]);
+
+        if (savedConnectionState !== null) {
+          setIsOnline(JSON.parse(savedConnectionState));
+        }
+
+        if (savedResponses !== null) {
+          const parsedResponses = JSON.parse(savedResponses);
+          setTaskResponses(parsedResponses);
+        }
+
+        if (savedTimestamp !== null) {
+          setLastUpdated(savedTimestamp);
+        }
+
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Error loading saved state:', error);
+        setIsInitialized(true);
+      }
+    };
+
+    loadSavedState();
+  }, [assignmentId]);
+
+  // Then, initialize tasks and merge with saved responses
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!alltasks || !isInitialized) return;
+
+      try {
+        setTasks(alltasks);
+        
+        // Create initial responses object
+        const initialResponses = {};
+        alltasks.forEach(task => {
+          task.fields.forEach(field => {
+            const fieldId = field.assignmentTaskFieldID;
+            // Preserve existing responses or set new ones
+            initialResponses[fieldId] = taskResponses[fieldId] || {
+              value: field.response,
+              status: false
+            };
+          });
+        });
+
+        // Only update if there are changes
+        if (JSON.stringify(initialResponses) !== JSON.stringify(taskResponses)) {
+          setTaskResponses(initialResponses);
+          console.log('Initial responses set:', JSON.stringify(initialResponses, null, 2));
+        }
+
+        // Set current task index
+        const baseSelTask = selectedTask?.id || alltasks[0]?.assignmentTaskID;
+        const selectedTaskIndex = alltasks.findIndex(task => task.id === baseSelTask);
+        setCurrentTaskIndex(selectedTaskIndex !== -1 ? selectedTaskIndex : 0);
+        
+      } catch (error) {
+        console.error('Error initializing tasks:', error);
+        Alert.alert('Error', 'Failed to initialize task data.');
+      } finally {
+        setLoading(false);
+      }
+    }, [alltasks, selectedTask, isInitialized, taskResponses])
+  );
+
+  // Save responses when they change
+  useEffect(() => {
+    const saveResponses = async () => {
+      if (!isInitialized || Object.keys(taskResponses).length === 0) return;
+      
+      try {
+        const timestamp = new Date().toISOString();
+        await Promise.all([
+          AsyncStorage.setItem(
+            `${RESPONSES_STORAGE_KEY}_${assignmentId}`, 
+            JSON.stringify(taskResponses)
+          ),
+          AsyncStorage.setItem(
+            `${RESPONSES_STORAGE_KEY}_${assignmentId}_timestamp`, 
+            timestamp
+          )
+        ]);
+        setLastUpdated(timestamp);
+      } catch (error) {
+        console.error('Error saving responses:', error);
+      }
+    };
+
+    saveResponses();
+  }, [taskResponses, assignmentId, isInitialized]);
+
+  // Keyboard listeners
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
@@ -78,93 +179,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
     };
   }, []);
 
-  // Load saved connection state and responses
-  useEffect(() => {
-    const loadSavedState = async () => {
-      try {
-        const [savedConnectionState, savedResponses, savedTimestamp] = await Promise.all([
-          AsyncStorage.getItem(CONNECTION_STATE_KEY),
-          AsyncStorage.getItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}`),
-          AsyncStorage.getItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}_timestamp`)
-        ]);
-
-        if (savedConnectionState !== null) {
-          setIsOnline(JSON.parse(savedConnectionState));
-        }
-
-        if (savedResponses !== null) {
-          setTaskResponses(JSON.parse(savedResponses));
-        }
-
-        if (savedTimestamp !== null) {
-          setLastUpdated(savedTimestamp);
-        }
-      } catch (error) {
-        console.error('Error loading saved state:', error);
-      }
-    };
-
-    loadSavedState();
-  }, [assignmentId]);
-
-  // Initialize tasks and responses
-  useFocusEffect(
-    React.useCallback(() => {
-      if (alltasks) {
-        setTasks(alltasks);
-        const initialResponses = {};
-        alltasks.forEach(task => {
-          task.fields.forEach(field => {
-            initialResponses[field.assignmentTaskFieldID] = {
-              value: field.response || '',
-              status: false
-            };
-          });
-        });
-
-        let baseSelTask;
-        if (selectedTask === undefined) {
-          baseSelTask = alltasks[0].assignmentTaskID;
-        } else {
-          baseSelTask = selectedTask.id;
-        }
-
-        setTaskResponses(prevResponses => ({
-          ...prevResponses,
-          ...initialResponses
-        }));
-
-        const selectedTaskIndex = alltasks.findIndex(task => task.id === baseSelTask);
-        setCurrentTaskIndex(selectedTaskIndex !== -1 ? selectedTaskIndex : 0);
-        setLoading(false);
-      } else {
-        console.error('No detailed data provided in route params');
-        Alert.alert('Error', 'Failed to load task data. Please go back and try again.');
-        setLoading(false);
-      }
-    }, [alltasks, selectedTask])
-  );
-
-  // Save responses when they change
-  useEffect(() => {
-    const saveResponses = async () => {
-      try {
-        const timestamp = new Date().toISOString();
-        await Promise.all([
-          AsyncStorage.setItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}`, JSON.stringify(taskResponses)),
-          AsyncStorage.setItem(`${RESPONSES_STORAGE_KEY}_${assignmentId}_timestamp`, timestamp)
-        ]);
-        setLastUpdated(timestamp);
-      } catch (error) {
-        console.error('Error saving responses:', error);
-      }
-    };
-
-    if (Object.keys(taskResponses).length > 0) {
-      saveResponses();
-    }
-  }, [taskResponses, assignmentId]);
-
+  // Helper functions
   const toggleConnection = async () => {
     const newState = !isOnline;
     setIsOnline(newState);
@@ -235,22 +250,17 @@ const TaskDetailScreen = ({ navigation, route }) => {
 
 
   const handleInputChange = (fieldId, value) => {
-    // console.log('HandleInputChange called with:', { fieldId, value });
-    
-    setTaskResponses(prevResponses => {
-      const newResponses = {
-        ...prevResponses,
-        [fieldId]: {
-          value: value,
-          status: true
-        }
-      };
-      
-      // Log the state update
-       //console.log('Updated taskResponses:', newResponses);
-      return newResponses;
-    });
+    console.log('Field ID:', fieldId, 'Value:', value);
+    setTaskResponses(prevResponses => ({
+      ...prevResponses,
+      [fieldId]: { value: value, status: true }
+    }));
+
+    console.log('Updated taskResponses:', JSON.stringify(alltasks, null, 2));
+
   };
+
+
   const handleCaptureImage = async (fieldId) => {
     console.log('Capture image for field:', fieldId);
     
@@ -330,8 +340,10 @@ const TaskDetailScreen = ({ navigation, route }) => {
           detail: field.detail,
           response: taskResponses[field.assignmentTaskFieldID]?.value?.toString() || ''
         }))
+
       }));
 
+      console.log('Formatted tasks:', JSON.stringify(formattedTasks, null, 2));
       const payload = {
         assignmentId: assignmentId,
         deviceId: -1,
@@ -477,7 +489,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
     case InputFormTaskInputType.Button:
   // Rename the variable from `options` to `radioOptions`
       const radioOptions = field.detail.split(',').map(option => option.trim());
-      console.log(radioOptions);
+      // console.log(radioOptions);
         return (
           <View style={[styles.fieldContainer, {
             flexDirection: 'row', // Stack radio buttons vertically
@@ -564,7 +576,7 @@ const TaskDetailScreen = ({ navigation, route }) => {
   };
 
 
-  // console.log(' tasks on:', JSON.stringify(tasks, null, 2));
+  //  console.log('all tasks :', JSON.stringify(alltasks, null, 2));
       
   const currentTask = tasks[currentTaskIndex];
   // console.log("currentTask", JSON.stringify(currentTask, null, 2))
