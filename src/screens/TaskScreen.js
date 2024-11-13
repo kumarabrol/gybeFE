@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   signOutButtonText: {
-    color: 'blue',
+    color: 'gold',
     fontSize: 16,
   },
   greetingBox: {
